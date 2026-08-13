@@ -467,9 +467,37 @@ async function handleFile(file) {
   }
 }
 
+// file:// で開いた場合、CDN上のワーカースクリプトをそのまま指定すると
+// ブラウザのセキュリティ制限でWorkerの生成に失敗することがある。
+// 一度スクリプトを取得してBlob化することで「同一オリジン」として扱わせ、回避する。
+let pdfWorkerBlobUrlPromise = null;
+function getPdfWorkerSrc() {
+  if (!pdfWorkerBlobUrlPromise) {
+    const cdnUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfWorkerBlobUrlPromise = fetch(cdnUrl)
+      .then(res => { if (!res.ok) throw new Error('status ' + res.status); return res.text(); })
+      .then(code => URL.createObjectURL(new Blob([code], { type: 'text/javascript' })))
+      .catch(err => { console.warn('PDFワーカーのBlob化に失敗。直接CDNを指定します。', err); return cdnUrl; });
+  }
+  return pdfWorkerBlobUrlPromise;
+}
+
+let tesseractWorkerBlobUrlPromise = null;
+function getTesseractWorkerPath() {
+  if (!tesseractWorkerBlobUrlPromise) {
+    const cdnUrl = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/worker.min.js';
+    tesseractWorkerBlobUrlPromise = fetch(cdnUrl)
+      .then(res => { if (!res.ok) throw new Error('status ' + res.status); return res.text(); })
+      .then(code => URL.createObjectURL(new Blob([code], { type: 'text/javascript' })))
+      .catch(err => { console.warn('OCRワーカーのBlob化に失敗。既定の読み込み方法を使用します。', err); return null; });
+  }
+  return tesseractWorkerBlobUrlPromise;
+}
+
 async function extractTextFromPDF(file) {
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   let text = '';
   const pageCount = Math.min(pdf.numPages, 5);
   for (let i = 1; i <= pageCount; i++) {
@@ -495,23 +523,29 @@ async function extractTextFromImage(file) {
 }
 
 async function ocrFile(file) {
-  const { data } = await Tesseract.recognize(file, 'jpn+eng', {
+  const workerPath = await getTesseractWorkerPath();
+  const options = {
     logger: m => {
       if (m.status === 'recognizing text') {
         setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70));
       }
     }
-  });
+  };
+  if (workerPath) options.workerPath = workerPath;
+  const { data } = await Tesseract.recognize(file, 'jpn+eng', options);
   return data.text;
 }
 async function ocrCanvas(canvas) {
-  const { data } = await Tesseract.recognize(canvas.toDataURL('image/png'), 'jpn+eng', {
+  const workerPath = await getTesseractWorkerPath();
+  const options = {
     logger: m => {
       if (m.status === 'recognizing text') {
         setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70));
       }
     }
-  });
+  };
+  if (workerPath) options.workerPath = workerPath;
+  const { data } = await Tesseract.recognize(canvas.toDataURL('image/png'), 'jpn+eng', options);
   return data.text;
 }
 
