@@ -449,12 +449,9 @@ async function handleFile(file) {
 
   try {
     setScanStatus('見積書を読み込んでいます…', 5);
-    let text = '';
-    if (isPdf) {
-      text = await extractTextFromPDF(file);
-    } else {
-      text = await extractTextFromImage(file);
-    }
+    const extractPromise = isPdf ? extractTextFromPDF(file) : extractTextFromImage(file);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000));
+    const text = await Promise.race([extractPromise, timeoutPromise]);
     setScanStatus('内容を解析しています…', 95);
     const data = analyzeText(normalizeText(text));
     applyExtractedData(data);
@@ -462,13 +459,17 @@ async function handleFile(file) {
   } catch (err) {
     console.error(err);
     setScanStatus(null);
-    alert('読み込み中にエラーが発生しました。お手数ですが、下の「文字を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (err && err.message ? err.message : err) + ')');
+    if (err && err.message === 'TIMEOUT') {
+      alert('30秒待っても読み込みが完了しませんでした。\n\nこのファイルの自動読み取りはうまくいかない可能性があります。お手数ですが、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
+    } else {
+      alert('読み込み中にエラーが発生しました。お手数ですが、下の「文字を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (err && err.message ? err.message : err) + ')');
+    }
   }
 }
 
 async function extractTextFromPDF(file) {
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: buf, disableWorker: true }).promise;
   let text = '';
   const pageCount = Math.min(pdf.numPages, 5);
   for (let i = 1; i <= pageCount; i++) {
