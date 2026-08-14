@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スマホ写真整理ツール - 撮影日でフォルダ分け</title>
+<script src="vendor/jszip.min.js"></script>
+<style>
+  :root{
+    --blue:#3182ce; --blue-dark:#2b6cb0; --bg:#f4f6f9; --card:#ffffff;
+    --text:#2d3748; --sub:#718096; --border:#e2e8f0;
+    --good:#38a169; --good-bg:#f0fff4; --good-border:#68d391;
+    --warn:#dd6b20; --warn-bg:#fffaf0; --warn-border:#f6ad55;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 16px; line-height: 1.6; }
+  .container { max-width: 760px; margin: 0 auto; background: var(--card); padding: 20px; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  h1 { text-align: center; color: #1a365d; font-size: 20px; margin: 4px 0 6px; }
+  p.sub { text-align: center; color: var(--sub); font-size: 13px; margin-bottom: 16px; }
+  .intro { background:#ebf8ff; border:1px solid #bee3f8; border-radius:10px; padding:14px 16px; font-size:13px; color:#2c5282; margin-bottom:18px; }
+  .intro b { color:#1a365d; }
+
+  .card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; color: var(--blue-dark); margin-top: 0; margin-bottom: 4px; }
+  .card .hint { font-size: 12px; color: var(--sub); margin-bottom: 12px; }
+
+  #drop-zone { border: 2px dashed #a0c4e4; border-radius: 10px; padding: 22px 14px; text-align: center; background: #f0f7ff; cursor: pointer; transition: background .2s; }
+  #drop-zone.dragover { background: #dbeeff; }
+  #drop-zone p { margin: 4px 0; font-size: 13px; color: #2c5282; }
+  #drop-zone .big { font-size: 14px; font-weight: bold; color: var(--blue-dark); }
+  #file-input { display: none; }
+
+  .form-group { margin-bottom: 0; }
+  label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #2d3748; }
+  select { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; background: #fff; }
+
+  #summary { display:none; font-size:13px; color:#2c5282; background:#ebf8ff; border:1px solid #bee3f8; border-radius:8px; padding:10px 12px; margin-bottom:12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--sub); font-weight: bold; background: #f8fafc; position: sticky; top: 0; }
+  #preview-wrap { max-height: 360px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; display: none; }
+  td.thumb img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); display:block; }
+  td.thumb .noimg { width: 40px; height: 40px; border-radius: 4px; background:#e2e8f0; }
+  .src-tag { display:inline-block; font-size:10px; font-weight:bold; padding:1px 6px; border-radius:8px; }
+  .src-tag.exif { background:#c6f6d5; color:#22543d; }
+  .src-tag.mtime { background:#fed7d7; color:#822727; }
+  td.new-name { font-family: ui-monospace, SFMono-Regular, monospace; }
+
+  .btn-submit { width: 100%; background: var(--blue); color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 6px; }
+  .btn-submit:hover { background: var(--blue-dark); }
+  .btn-submit:disabled { background: #a0aec0; cursor: not-allowed; }
+
+  #progress-wrap { display:none; margin-top: 10px; }
+  #progress-bar-bg { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+  #progress-bar { height: 100%; width: 0%; background: var(--blue); transition: width .15s; }
+  #progress-label { text-align:center; font-size:12px; color: var(--blue-dark); margin-top: 6px; }
+
+  #done-box { display:none; background: var(--good-bg); border: 2px solid var(--good-border); border-radius: 10px; padding: 16px; text-align:center; margin-top: 14px; }
+  #done-box b { color: #22543d; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>スマホ写真整理ツール</h1>
+  <p class="sub">撮影日時でフォルダ分け＆リネームしてZIPでダウンロード</p>
+
+  <div class="intro">
+    <b>使い方:</b> スマホの写真を選択すると、撮影日時を読み取って「年月ごとのフォルダ」に振り分け、わかりやすいファイル名を付けます。
+    処理はすべてこの端末（ブラウザ）内で完結し、写真がどこかのサーバーに送信されることはありません。
+  </div>
+
+  <div class="card">
+    <h2>1. 写真を選択</h2>
+    <p class="hint">複数枚まとめて選択できます（JPEG推奨。HEIC/PNGなど撮影日時が読み取れない形式は更新日時で代用します）</p>
+    <div id="drop-zone">
+      <p class="big">📷 タップして写真を選択</p>
+      <p>またはここにドラッグ＆ドロップ</p>
+    </div>
+    <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple>
+  </div>
+
+  <div class="card">
+    <h2>2. 振り分け方法</h2>
+    <div class="form-group">
+      <label for="group-mode">フォルダ分けの単位</label>
+      <select id="group-mode">
+        <option value="ym" selected>年月ごと（例: 2026-08）</option>
+        <option value="y">年ごと（例: 2026）</option>
+        <option value="ymd">年月日ごと（例: 2026-08-14）</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="summary"></div>
+  <div id="preview-wrap">
+    <table>
+      <thead><tr><th></th><th>元のファイル名</th><th>振り分け先</th><th>新しいファイル名</th></tr></thead>
+      <tbody id="preview-body"></tbody>
+    </table>
+  </div>
+
+  <button class="btn-submit" id="download-btn" style="display:none;">この内容でZIPを作成してダウンロード</button>
+
+  <div id="progress-wrap">
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+    <div id="progress-label">ZIPを作成中...</div>
+  </div>
+
+  <div id="done-box">
+    ✅ <b>完了しました。</b><br>ダウンロードしたZIPを解凍すると、フォルダごとに整理された写真が入っています。
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const groupModeSel = document.getElementById('group-mode');
+const summaryEl = document.getElementById('summary');
+const previewWrap = document.getElementById('preview-wrap');
+const previewBody = document.getElementById('preview-body');
+const downloadBtn = document.getElementById('download-btn');
+const progressWrap = document.getElementById('progress-wrap');
+const progressBar = document.getElementById('progress-bar');
+const progressLabel = document.getElementById('progress-label');
+const doneBox = document.getElementById('done-box');
+
+let entries = []; // { file, date, source }
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+groupModeSel.addEventListener('change', () => { if (entries.length) buildPlan(); });
+
+async function handleFiles(fileList) {
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
+  if (!files.length) return;
+
+  doneBox.style.display = 'none';
+  summaryEl.style.display = 'block';
+  summaryEl.textContent = `${files.length} 枚を解析中...`;
+
+  entries = [];
+  for (const file of files) {
+    const { date, source } = await getPhotoDate(file);
+    entries.push({ file, date, source });
+  }
+
+  buildPlan();
+}
+
+function getPad(n, len) { return String(n).padStart(len, '0'); }
+
+function folderKeyFor(date, mode) {
+  const y = date.getFullYear();
+  const m = getPad(date.getMonth() + 1, 2);
+  const d = getPad(date.getDate(), 2);
+  if (mode === 'y') return `${y}`;
+  if (mode === 'ymd') return `${y}-${m}-${d}`;
+  return `${y}-${m}`;
+}
+
+function buildPlan() {
+  const mode = groupModeSel.value;
+  const sorted = [...entries].sort((a, b) => a.date - b.date);
+  const seqByFolder = {};
+
+  previewBody.innerHTML = '';
+  sorted.forEach(entry => {
+    const folder = folderKeyFor(entry.date, mode);
+    seqByFolder[folder] = (seqByFolder[folder] || 0) + 1;
+    const seq = getPad(seqByFolder[folder], 3);
+    const y = entry.date.getFullYear();
+    const m = getPad(entry.date.getMonth() + 1, 2);
+    const d = getPad(entry.date.getDate(), 2);
+    const ext = (entry.file.name.match(/\.[^.]+$/) || ['.jpg'])[0].toLowerCase();
+    entry.folder = folder;
+    entry.newName = `${y}-${m}-${d}_${seq}${ext}`;
+
+    const tr = document.createElement('tr');
+    const url = URL.createObjectURL(entry.file);
+    tr.innerHTML = `
+      <td class="thumb"><img src="${url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'noimg'}))"></td>
+      <td>${escapeHtml(entry.file.name)}</td>
+      <td>${folder}/ <span class="src-tag ${entry.source}">${entry.source === 'exif' ? '撮影日時' : '更新日時'}</span></td>
+      <td class="new-name">${entry.newName}</td>
+    `;
+    previewBody.appendChild(tr);
+  });
+
+  const folders = new Set(sorted.map(e => e.folder));
+  summaryEl.textContent = `${sorted.length} 枚を ${folders.size} 個のフォルダに振り分けます。`;
+  previewWrap.style.display = 'block';
+  downloadBtn.style.display = 'block';
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+downloadBtn.addEventListener('click', async () => {
+  if (!entries.length) return;
+  downloadBtn.disabled = true;
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  doneBox.style.display = 'none';
+
+  const zip = new JSZip();
+  for (const entry of entries) {
+    zip.folder(entry.folder).file(entry.newName, entry.file);
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob' }, meta => {
+    progressBar.style.width = meta.percent.toFixed(0) + '%';
+    progressLabel.textContent = `ZIPを作成中... ${meta.percent.toFixed(0)}%`;
+  });
+
+  const a = document.createElement('a');
+  const stamp = new Date();
+  a.href = URL.createObjectURL(blob);
+  a.download = `整理済み写真_${stamp.getFullYear()}${getPad(stamp.getMonth()+1,2)}${getPad(stamp.getDate(),2)}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  progressWrap.style.display = 'none';
+  doneBox.style.display = 'block';
+  downloadBtn.disabled = false;
+});
+
+// --- EXIF date extraction (JPEG only; other formats fall back to lastModified) ---
+async function getPhotoDate(file) {
+  try {
+    if (file.type === 'image/jpeg' || /\.(jpe?g)$/i.test(file.name)) {
+      const buffer = await file.slice(0, 256 * 1024).arrayBuffer();
+      const exifDate = readExifDate(buffer);
+      if (exifDate) return { date: exifDate, source: 'exif' };
+    }
+  } catch (e) { /* fall back below */ }
+  return { date: new Date(file.lastModified), source: 'mtime' };
+}
+
+function readExifDate(buffer) {
+  const view = new DataView(buffer);
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return null;
+  let offset = 2;
+  while (offset < view.byteLength - 4) {
+    if (view.getUint8(offset) !== 0xFF) return null;
+    const marker = view.getUint8(offset + 1);
+    if (marker === 0xD8 || (marker >= 0xD0 && marker <= 0xD7)) { offset += 2; continue; }
+    if (marker === 0xD9 || marker === 0xDA) break; // EOI / start of scan: no more metadata markers
+    const size = view.getUint16(offset + 2);
+    if (marker === 0xE1 && getAscii(view, offset + 4, 4) === 'Exif') {
+      const tiffOffset = offset + 4 + 6;
+      const date = parseTiffForDate(view, tiffOffset);
+      if (date) return date;
+    }
+    offset += 2 + size;
+  }
+  return null;
+}
+
+function getAscii(view, offset, length) {
+  let s = '';
+  for (let i = 0; i < length; i++) s += String.fromCharCode(view.getUint8(offset + i));
+  return s;
+}
+
+function parseTiffForDate(view, tiffOffset) {
+  const little = getAscii(view, tiffOffset, 2) === 'II';
+  const ifd0Offset = tiffOffset + view.getUint32(tiffOffset + 4, little);
+  const ifd0 = readIfd(view, tiffOffset, ifd0Offset, little);
+  if (ifd0[0x8769]) {
+    const exifIfd = readIfd(view, tiffOffset, tiffOffset + ifd0[0x8769], little);
+    if (exifIfd[0x9003]) return parseExifDateString(exifIfd[0x9003]);
+    if (exifIfd[0x9004]) return parseExifDateString(exifIfd[0x9004]);
+  }
+  if (ifd0[0x0132]) return parseExifDateString(ifd0[0x0132]);
+  return null;
+}
+
+function readIfd(view, tiffOffset, ifdOffset, little) {
+  const result = {};
+  if (ifdOffset + 2 > view.byteLength) return result;
+  const numEntries = view.getUint16(ifdOffset, little);
+  for (let i = 0; i < numEntries; i++) {
+    const entryOffset = ifdOffset + 2 + i * 12;
+    if (entryOffset + 12 > view.byteLength) break;
+    const tag = view.getUint16(entryOffset, little);
+    const type = view.getUint16(entryOffset + 2, little);
+    const count = view.getUint32(entryOffset + 4, little);
+    const valueOffset = entryOffset + 8;
+    if (type === 2) { // ASCII
+      let strOffset = count > 4 ? tiffOffset + view.getUint32(valueOffset, little) : valueOffset;
+      if (strOffset + count <= view.byteLength) {
+        result[tag] = getAscii(view, strOffset, count).replace(/\0+$/, '');
+      }
+    } else if (type === 3) { // SHORT
+      result[tag] = view.getUint16(valueOffset, little);
+    } else if (type === 4) { // LONG
+      result[tag] = view.getUint32(valueOffset, little);
+    }
+  }
+  return result;
+}
+
+function parseExifDateString(s) {
+  const m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(s);
+  if (!m) return null;
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+}
+</script>
+</body>
+</html>
