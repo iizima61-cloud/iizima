@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>飯島防水株式会社｜長野市・千曲市・埴科郡の防水工事・外壁塗装専門店</title>
 <meta name="description" content="長野市篠ノ井を拠点に、長野市・千曲市・埴科郡を中心とした防水工事・塗装工事を専門に手がける飯島防水株式会社。職人歴30年以上の現場実績。無料診断・お見積り承ります。">
+<link rel="icon" href="assets/logo.webp" type="image/webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -116,12 +117,22 @@
   }
   .logo{
     display:flex;
-    flex-direction:column;
+    align-items:center;
+    gap:10px;
     font-weight:900;
     color:var(--navy);
     font-size:19px;
     letter-spacing:.02em;
     text-decoration:none;
+  }
+  .logo img{
+    height:42px;
+    width:auto;
+    flex:none;
+  }
+  .logo .logo-text{
+    display:flex;
+    flex-direction:column;
   }
   .logo small{
     font-weight:500;
@@ -669,10 +680,20 @@
     margin-bottom:24px;
   }
   footer.site-footer .foot-logo{
+    display:flex;
+    align-items:center;
+    gap:10px;
     color:#fff;
     font-weight:900;
     font-size:17px;
-    margin-bottom:10px;
+    margin-bottom:12px;
+  }
+  footer.site-footer .foot-logo img{
+    height:34px;
+    width:auto;
+    background:#fff;
+    border-radius:6px;
+    padding:2px;
   }
   footer.site-footer .foot-links a{
     display:block;
@@ -773,8 +794,11 @@
 
 <header class="site-header">
   <div class="container nav-wrap">
-    <a href="#top" class="logo">飯島防水株式会社
-      <small>Specialist in waterproofing and painting</small>
+    <a href="#top" class="logo">
+      <img src="assets/logo.webp" alt="飯島防水株式会社 ロゴ">
+      <span class="logo-text">飯島防水株式会社
+        <small>Specialist in waterproofing and painting</small>
+      </span>
     </a>
     <nav class="main-nav">
       <ul>
@@ -1131,7 +1155,7 @@
   <div class="container">
     <div class="foot-grid">
       <div>
-        <div class="foot-logo">飯島防水株式会社</div>
+        <div class="foot-logo"><img src="assets/logo.webp" alt="飯島防水株式会社 ロゴ">飯島防水株式会社</div>
         <div>〒388-8014 長野市篠ノ井塩崎3139番地1</div>
         <div>携帯 090-1883-5221(現場直通)</div>
         <div>固定・FAX 026-292-8221(事務所)</div>
