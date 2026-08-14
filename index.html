@@ -477,6 +477,32 @@
     position:relative;
   }
   .case-thumb span.icon{font-size:34px;display:block;margin-bottom:6px;}
+  .case-photo-main{
+    height:150px;
+    overflow:hidden;
+    background:#0c3a5c;
+  }
+  .case-photo-main img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .case-thumbs{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:2px;
+    background:#0c3a5c;
+  }
+  .case-thumbs img{
+    width:100%;
+    height:52px;
+    object-fit:cover;
+    display:block;
+    cursor:pointer;
+    transition:opacity .15s;
+  }
+  .case-thumbs img:hover{opacity:.8;}
   .case-body{padding:22px 22px 24px;}
   .case-cat{font-size:12px;color:var(--blue);font-weight:700;margin-bottom:8px;}
   .case-body h3{font-size:16.5px;color:var(--navy);margin-bottom:14px;font-weight:700;}
@@ -978,7 +1004,15 @@
       </div>
       <div class="case-grid">
         <div class="case-card">
-          <div class="case-thumb"><div><span class="icon">🏠</span>屋根板金塗装工事</div></div>
+          <div class="case-photo-main">
+            <img src="assets/cases/bankin-tosou-05.jpg" alt="屋根板金塗装工事 施工後の様子" loading="lazy">
+          </div>
+          <div class="case-thumbs">
+            <img src="assets/cases/bankin-tosou-01.jpg" alt="屋根板金塗装工事 施工写真1" loading="lazy">
+            <img src="assets/cases/bankin-tosou-02.jpg" alt="屋根板金塗装工事 施工写真2" loading="lazy">
+            <img src="assets/cases/bankin-tosou-03.jpg" alt="屋根板金塗装工事 施工写真3" loading="lazy">
+            <img src="assets/cases/bankin-tosou-04.jpg" alt="屋根板金塗装工事 施工写真4" loading="lazy">
+          </div>
           <div class="case-body">
             <div class="case-cat">戸建て住宅｜千曲市</div>
             <h3>屋根板金塗装工事</h3>
@@ -1002,7 +1036,15 @@
           </div>
         </div>
         <div class="case-card">
-          <div class="case-thumb"><div><span class="icon">🏫</span>屋根改修・断熱工事</div></div>
+          <div class="case-photo-main">
+            <img src="assets/cases/koujou-dannetsu-02.jpg" alt="屋根改修・断熱材取付工事 施工中の様子" loading="lazy">
+          </div>
+          <div class="case-thumbs">
+            <img src="assets/cases/koujou-dannetsu-01.jpg" alt="屋根改修・断熱材取付工事 施工写真1" loading="lazy">
+            <img src="assets/cases/koujou-dannetsu-03.jpg" alt="屋根改修・断熱材取付工事 施工写真2" loading="lazy">
+            <img src="assets/cases/koujou-dannetsu-04.jpg" alt="屋根改修・断熱材取付工事 施工写真3" loading="lazy">
+            <img src="assets/cases/koujou-dannetsu-05.jpg" alt="屋根改修・断熱材取付工事 施工写真4" loading="lazy">
+          </div>
           <div class="case-body">
             <div class="case-cat">公共施設</div>
             <h3>屋根改修・断熱材取付工事</h3>
