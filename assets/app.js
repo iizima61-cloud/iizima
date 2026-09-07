@@ -21,6 +21,7 @@ const HISTORY_MAX = 30;
 const PAINT_RATE = {
   urethane:  { min: 2500, max: 3500 },
   silicon:   { min: 3000, max: 4000 },
+  radical:   { min: 3500, max: 4500 },
   fluorine:  { min: 4000, max: 5000 },
   inorganic: { min: 4500, max: 6000 },
   unknown:   { min: 3000, max: 4500 }
@@ -44,6 +45,7 @@ const PAINT_PRODUCT_KEYWORDS = [
 const GRADE_KEYWORDS = [
   { grade: "inorganic", words: ["無機","むき","ハイブリッド無機"] },
   { grade: "fluorine",  words: ["フッ素","ふっ素"] },
+  { grade: "radical",   words: ["ラジカル制御","ラジカル系","ラジカル"] },
   { grade: "silicon",   words: ["シリコン"] },
   { grade: "urethane",  words: ["ウレタン塗料","ウレタン系"] }
 ];
@@ -456,7 +458,7 @@ function applyExtractedData(d) {
   if (d.grade) {
     document.getElementById('paint-grade').value = d.grade;
     document.getElementById('grade-auto').style.display = 'inline-block';
-    const gradeName = {urethane:'ウレタン', silicon:'シリコン', fluorine:'フッ素', inorganic:'無機'}[d.grade];
+    const gradeName = {urethane:'ウレタン', silicon:'シリコン', radical:'ラジカル制御', fluorine:'フッ素', inorganic:'無機'}[d.grade];
     reportLines.push(`🎨 塗料のグレードとして <b>「${gradeName}」</b> という記載を見つけました。グレードによって適正相場が変わるため、自動で反映しています。`);
   } else {
     document.getElementById('grade-auto').style.display = 'none';
