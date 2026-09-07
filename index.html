@@ -2,898 +2,244 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2b6cb0">
 <title>外壁塗装・防水工事 見積もり適正診断アプリ</title>
+<link rel="stylesheet" href="assets/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
-<style>
-  :root{
-    --blue:#3182ce; --blue-dark:#2b6cb0; --bg:#f4f6f9; --card:#ffffff;
-    --text:#2d3748; --sub:#718096; --border:#e2e8f0;
-    --good:#38a169; --good-bg:#f0fff4; --good-border:#68d391;
-    --warn:#dd6b20; --warn-bg:#fffaf0; --warn-border:#f6ad55;
-    --danger:#e53e3e; --danger-bg:#fff5f5; --danger-border:#fc8181;
-  }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Roboto, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 16px; line-height: 1.6; }
-  .container { max-width: 760px; margin: 0 auto; background: var(--card); padding: 20px; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-  h1 { text-align: center; color: #1a365d; font-size: 21px; margin: 4px 0 6px; }
-  p.sub { text-align: center; color: var(--sub); font-size: 13px; margin-bottom: 16px; }
-  .intro { background:#ebf8ff; border:1px solid #bee3f8; border-radius:10px; padding:14px 16px; font-size:13px; color:#2c5282; margin-bottom:18px; }
-  .intro b { color:#1a365d; }
-
-  .sample-btns { display: flex; gap: 8px; justify-content: center; margin-bottom: 18px; flex-wrap: wrap; }
-  .btn-sample { background: #edf2f7; border: 1px solid #cbd5e0; padding: 7px 13px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; color: #4a5568; }
-  .btn-sample:hover { background: #e2e8f0; }
-
-  .card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  .card h2 { font-size: 15px; color: var(--blue-dark); margin-top: 0; margin-bottom: 4px; }
-  .card .hint { font-size: 12px; color: var(--sub); margin-bottom: 12px; }
-
-  /* アップロード */
-  #drop-zone { border: 2px dashed #a0c4e4; border-radius: 10px; padding: 22px 14px; text-align: center; background: #f0f7ff; cursor: pointer; transition: background .2s; }
-  #drop-zone.dragover { background: #dbeeff; }
-  #drop-zone p { margin: 4px 0; font-size: 13px; color: #2c5282; }
-  #drop-zone .big { font-size: 14px; font-weight: bold; color: var(--blue-dark); }
-  #file-input { display: none; }
-  #scan-status { text-align: center; font-size: 13px; color: var(--blue-dark); margin-top: 10px; display: none; }
-  #lib-status { display:none; font-size:12px; padding:8px 12px; border-radius:8px; margin-bottom:10px; }
-  #lib-status.checking { display:block; background:#edf2f7; color:#4a5568; }
-  #lib-status.ok { display:block; background:#f0fff4; color:#22543d; border:1px solid #9ae6b4; }
-  #lib-status.fail { display:block; background:#fff5f5; color:#822727; border:1px solid #feb2b2; }
-  #scan-progress { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 6px; display: none; }
-  #scan-progress-bar { height: 100%; width: 0%; background: var(--blue); transition: width .2s; }
-
-  textarea#paste-text { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 13px; min-height: 70px; font-family: inherit; }
-  .or-divider { text-align: center; font-size: 12px; color: var(--sub); margin: 10px 0; }
-
-  #ai-report { display:none; background:#fffbea; border:1px solid #f6e05e; border-radius:10px; padding:14px 16px; margin-top:14px; font-size:13px; }
-  #ai-report h3 { margin:0 0 8px; font-size:14px; color:#744210; }
-  #ai-report ul { margin: 4px 0; padding-left: 20px; }
-  #ai-report li { margin-bottom: 4px; }
-
-  /* フォーム */
-  .form-group { margin-bottom: 12px; }
-  label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #2d3748; }
-  input[type="number"], select, input[type="text"] { width: 100%; padding: 9px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; background: #fff; }
-  .area-row { display:flex; align-items:center; gap:10px; margin: 8px 0 4px 26px; }
-  .area-row label { flex: 0 0 auto; font-weight:normal; font-size:13px; margin:0; color:#4a5568; }
-  .area-row input { max-width: 130px; }
-  .area-row .tsubo-hint { font-size:12px; color:var(--sub); white-space:nowrap; }
-
-  .scope-item { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; background:#fff; }
-  .scope-item .check-item { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:bold; cursor:pointer; }
-  .scope-item .check-item input { width:auto; }
-  .scope-area { display:none; }
-  .scope-area.show { display:block; }
-
-  .check-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
-  .check-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; cursor: pointer; }
-  .check-item input { margin-top: 3px; width:auto; }
-  .check-item.disabled { opacity: .4; pointer-events: none; }
-  .auto-tag { display:inline-block; background:#c6f6d5; color:#22543d; font-size:10px; font-weight:bold; padding:1px 6px; border-radius:8px; margin-left:6px; }
-
-  .btn-submit { width: 100%; background: var(--blue); color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 6px; }
-  .btn-submit:hover { background: var(--blue-dark); }
-
-  #result-area { display: none; margin-top: 22px; padding-top: 18px; border-top: 2px dashed var(--border); }
-  .score-box { text-align: center; padding: 20px; border-radius: 10px; margin-bottom: 18px; }
-  .score-box.good { background: var(--good-bg); border: 2px solid var(--good-border); }
-  .score-box.warn { background: var(--warn-bg); border: 2px solid var(--warn-border); }
-  .score-box.danger { background: var(--danger-bg); border: 2px solid var(--danger-border); }
-  .score-title { font-size: 17px; font-weight: bold; margin-bottom: 4px; }
-  .score-badge { font-size: 30px; font-weight: bold; margin: 6px 0; }
-  .price-compare { font-size: 13px; color: #4a5568; margin-top: 6px; }
-
-  .gauge-wrap { background:#e2e8f0; border-radius: 6px; height: 14px; margin: 10px 0; position: relative; overflow: visible; }
-  .gauge-fill { background: linear-gradient(90deg,#68d391,#f6ad55,#fc8181); height: 100%; border-radius: 6px; }
-  .gauge-marker { position:absolute; top:-4px; width:3px; height:22px; background:#2d3748; }
-
-  .issue-list { margin-top: 10px; }
-  .issue-item { background: #fff; border-left: 4px solid #cbd5e0; padding: 10px 12px; margin-bottom: 8px; border-radius: 0 6px 6px 0; font-size: 13px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-  .issue-item.danger { border-left-color: var(--danger); }
-  .issue-item.warn { border-left-color: var(--warn); }
-  .issue-item.good { border-left-color: var(--good); }
-  .issue-item .tag { display:inline-block; font-size:10px; font-weight:bold; padding:1px 6px; border-radius:8px; margin-left:6px; background:#edf2f7; color:#4a5568; }
-
-  #ai-explain { font-size: 13px; color: #4a5568; }
-  #ai-explain p { margin: 0 0 10px; }
-  #ai-explain .persona { font-weight:bold; color:#1a365d; }
-
-  .template-section { margin-bottom: 14px; }
-  .template-section h4 { font-size: 13px; color: var(--blue-dark); margin: 0 0 6px; }
-  .template-box { background: #edf2f7; padding: 12px; border-radius: 6px; font-size: 12px; white-space: pre-wrap; font-family: "Courier New", monospace; color: #2d3748; border: 1px solid #cbd5e0; margin-bottom: 6px; }
-  .btn-copy { background: #fff; border: 1px solid var(--blue); color: var(--blue); font-size: 12px; font-weight: bold; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
-  .btn-copy:hover { background: #ebf8ff; }
-  .btn-copy.copied { background: var(--good); color: #fff; border-color: var(--good); }
-
-  footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 20px; }
-</style>
 </head>
 <body>
-<div class="container">
-  <h1>外壁塗装・防水工事 見積もり適正診断</h1>
-  <p class="sub">むずかしい専門知識がなくても、見積書が適正かどうかをその場でチェックできます</p>
-
-  <div class="intro">
-    <b>使い方はかんたん3ステップ</b>：①お手元の見積書の写真・PDFを送る（または金額などを直接入力）→ ②工事の内容を選ぶ → ③「診断する」を押すだけ。<br>
-    専門用語には <b>やさしい説明</b> をつけていますので、初めての方でも安心してご利用いただけます。
+<div class="app">
+  <div class="topbar">
+    <h1>外壁塗装・防水工事 見積もり適正診断</h1>
+    <p>むずかしい専門知識がなくても、見積書が適正かその場でチェック</p>
   </div>
 
-  <div class="sample-btns">
-    <button class="btn-sample" onclick="loadSample('danger')">サンプル①：あやしい見積り</button>
-    <button class="btn-sample" onclick="loadSample('cheap')">サンプル②：安すぎる見積り</button>
-    <button class="btn-sample" onclick="loadSample('good')">サンプル③：適正な見積り</button>
-  </div>
+  <main>
+    <section id="tab-diagnose" class="tab-panel active">
 
-  <div class="card">
-    <h2>STEP1. 見積書を読み込む（任意）</h2>
-    <div class="hint">写真（JPG/PNG）またはPDFを選ぶと、金額や面積、塗料の種類などをAIが自動で読み取ってフォームに入力します。読み込まなくても、下のフォームに直接入力すれば診断できます。</div>
-    <div id="lib-status"></div>
-    <div id="drop-zone">
-      <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
-      <p>またはタップしてファイルを選択（写真 / PDF）</p>
-      <input type="file" id="file-input" accept="image/*,application/pdf">
-    </div>
-    <div id="scan-status">解析中です…</div>
-    <div id="scan-progress"><div id="scan-progress-bar"></div></div>
+      <div class="intro">
+        <b>使い方はかんたん3ステップ</b>：①お手元の見積書の写真・PDFを送る（または金額などを直接入力）→ ②工事の内容を選ぶ → ③「診断する」を押すだけ。<br>
+        専門用語には <b>やさしい説明</b> をつけていますので、初めての方でも安心してご利用いただけます。
+      </div>
 
-    <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
-    <label for="paste-text" style="font-weight:normal;font-size:12px;color:#718096;">見積書の文字をコピーしてこちらに貼り付けることもできます</label>
-    <textarea id="paste-text" placeholder="例）御見積合計金額 1,250,000円（税込）　施工面積 135.5㎡　シリコン塗料 一式 ..."></textarea>
-    <button type="button" class="btn-sample" style="margin-top:8px;" onclick="analyzePastedText()">この文章を解析する</button>
+      <div class="sample-btns">
+        <button class="btn-sample" onclick="loadSample('danger')">サンプル①：あやしい見積り</button>
+        <button class="btn-sample" onclick="loadSample('cheap')">サンプル②：安すぎる見積り</button>
+        <button class="btn-sample" onclick="loadSample('good')">サンプル③：適正な見積り</button>
+      </div>
 
-    <div id="ai-report"></div>
-  </div>
+      <div class="card">
+        <h2><span class="step-num">1</span> 見積書を読み込む（任意）</h2>
+        <div class="hint">写真（JPG/PNG）またはPDFを選ぶと、金額や面積、塗料の種類などをAIが自動で読み取ってフォームに入力します。読み込まなくても、下のフォームに直接入力すれば診断できます。</div>
+        <div id="lib-status"></div>
+        <div id="drop-zone">
+          <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
+          <p>またはタップしてファイルを選択（写真 / PDF）</p>
+          <input type="file" id="file-input" accept="image/*,application/pdf">
+        </div>
+        <div id="scan-status">解析中です…</div>
+        <div id="scan-progress"><div id="scan-progress-bar"></div></div>
 
-  <form id="diag-form" onsubmit="calculateDiagnostic(event)">
-    <div class="card">
-      <h2>STEP2. 工事の内容と面積</h2>
-      <div class="hint">見積書に書かれている工事にチェックを入れ、それぞれの施工面積（㎡）を入力してください。バルコニーなど狭い場所は「1㎡」から入力できます。分からない場合はおおよそで構いません。</div>
+        <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
+        <label for="paste-text" style="font-weight:normal;font-size:12px;color:#718096;">見積書の文字をコピーしてこちらに貼り付けることもできます</label>
+        <textarea id="paste-text" placeholder="例）御見積合計金額 1,250,000円（税込）　施工面積 135.5㎡　シリコン塗料 一式 ..."></textarea>
+        <button type="button" class="btn-sample" style="margin-top:8px;" onclick="analyzePastedText()">この文章を解析する</button>
 
-      <div class="scope-item">
-        <label class="check-item"><input type="checkbox" id="chk-wall" onchange="onScopeChange()"> 外壁塗装</label>
-        <div class="scope-area" id="area-wall-wrap">
-          <div class="area-row">
-            <label>施工面積</label>
-            <input type="number" id="area-wall" min="1" step="0.1" value="120" oninput="onAreaChange()">
-            <span>㎡</span>
-            <span class="tsubo-hint" id="tsubo-wall">（約36.3坪）</span>
+        <div id="ai-report"></div>
+      </div>
+
+      <form id="diag-form">
+        <div class="card">
+          <h2><span class="step-num">2</span> 工事の内容と面積</h2>
+          <div class="hint">見積書に書かれている工事にチェックを入れ、それぞれの施工面積（㎡）を入力してください。バルコニーなど狭い場所は「1㎡」から入力できます。分からない場合はおおよそで構いません。</div>
+
+          <div class="scope-item">
+            <label class="check-item"><input type="checkbox" id="chk-wall" onchange="onScopeChange()"> 外壁塗装</label>
+            <div class="scope-area" id="area-wall-wrap">
+              <div class="area-row">
+                <label>施工面積</label>
+                <input type="number" id="area-wall" min="1" step="0.1" value="120" oninput="onAreaChange()">
+                <span>㎡</span>
+                <span class="tsubo-hint" id="tsubo-wall">（約36.3坪）</span>
+              </div>
+            </div>
           </div>
+
+          <div class="scope-item">
+            <label class="check-item"><input type="checkbox" id="chk-roof" onchange="onScopeChange()"> 屋根塗装</label>
+            <div class="scope-area" id="area-roof-wrap">
+              <div class="area-row">
+                <label>施工面積</label>
+                <input type="number" id="area-roof" min="1" step="0.1" value="60" oninput="onAreaChange()">
+                <span>㎡</span>
+                <span class="tsubo-hint" id="tsubo-roof">（約18.2坪）</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scope-item">
+            <label class="check-item"><input type="checkbox" id="chk-balcony" onchange="onScopeChange()"> バルコニー防水</label>
+            <div class="scope-area" id="area-balcony-wrap">
+              <div class="area-row">
+                <label>施工面積</label>
+                <input type="number" id="area-balcony" min="1" step="0.1" value="8" oninput="onAreaChange()">
+                <span>㎡</span>
+                <span class="tsubo-hint" id="tsubo-balcony">（約2.4坪）</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scope-item">
+            <label class="check-item"><input type="checkbox" id="chk-rooftop" onchange="onScopeChange()"> 屋上防水</label>
+            <div class="scope-area" id="area-rooftop-wrap">
+              <div class="area-row">
+                <label>施工面積</label>
+                <input type="number" id="area-rooftop" min="1" step="0.1" value="50" oninput="onAreaChange()">
+                <span>㎡</span>
+                <span class="tsubo-hint" id="tsubo-rooftop">（約15.1坪）</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="step-num">3</span> 見積もり提示総額</h2>
+          <div class="hint">見積書に書かれている「合計金額（税込）」を入力してください。</div>
+          <div class="form-group">
+            <label>見積もり提示総額（万円）</label>
+            <input type="number" id="total-price" value="135" min="0.1" step="0.1" required>
+          </div>
+          <div class="form-group">
+            <label>使われている塗料のグレード（分かれば選択）<span id="grade-auto" class="auto-tag" style="display:none;">AIが検出</span></label>
+            <select id="paint-grade">
+              <option value="unknown">わからない・書いていない</option>
+              <option value="urethane">ウレタン（一般的なグレード）</option>
+              <option value="silicon" selected>シリコン（人気の標準グレード）</option>
+              <option value="fluorine">フッ素（高耐久グレード）</option>
+              <option value="inorganic">無機（最高耐久グレード）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>値引き額（万円）※見積書に大幅値引きがあれば入力</label>
+            <input type="number" id="discount-amount" value="0" min="0" step="0.1">
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="step-num">4</span> 見積書の記載内容チェック</h2>
+          <div class="hint">見積書を見て、当てはまるものにチェックを入れてください（AIが読み取った場合は自動でチェックされています）。</div>
+          <div class="check-grid">
+            <label class="check-item">
+              <input type="checkbox" id="chk-isshiki">
+              <span>「〇〇工事一式」という書き方が多く、㎡やmなどの数量がほとんど書かれていない<br><span style="color:#a0aec0;">（→内訳が分からず、何にいくら使われているか不透明という意味です）</span></span>
+            </label>
+            <label class="check-item" id="row-no-paint-name">
+              <input type="checkbox" id="chk-no-paint-name">
+              <span>使用する塗料の「メーカー名」や「正式な商品名」が書かれていない<br><span style="color:#a0aec0;">（→単に「シリコン塗料」とだけ書かれ、どこの会社の何という商品か不明ということです）</span></span>
+            </label>
+            <label class="check-item" id="row-no-repair">
+              <input type="checkbox" id="chk-no-repair">
+              <span>ひび割れ補修やシーリング（コーキング）、下地の処理についての記載がない<br><span style="color:#a0aec0;">（→家で言う「化粧下地」にあたる工程で、ここを省くと数年で傷みが再発しやすくなります）</span></span>
+            </label>
+            <label class="check-item" id="row-no-drain">
+              <input type="checkbox" id="chk-no-drain">
+              <span>防水工事なのに「改修ドレン」（排水口の交換）についての記載がない<br><span style="color:#a0aec0;">（→排水口の劣化を放置すると雨漏りの直接原因になります）</span></span>
+            </label>
+            <label class="check-item">
+              <input type="checkbox" id="chk-pushy">
+              <span>「本日契約なら◯◯円引き」「今だけ足場代無料」など、契約を急がせる言葉がある</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="sticky-cta">
+          <button type="submit" class="btn-submit">この内容で診断する</button>
+        </div>
+      </form>
+
+      <div id="result-area">
+        <div id="score-box" class="score-box">
+          <div class="score-title" id="score-title">診断結果</div>
+          <div class="score-badge" id="score-badge">75点</div>
+          <div class="gauge-wrap"><div class="gauge-fill" id="gauge-fill" style="width:100%;"></div><div class="gauge-marker" id="gauge-marker" style="left:75%;"></div></div>
+          <div id="score-desc" style="font-size: 14px;"></div>
+          <div class="price-compare" id="price-compare"></div>
+        </div>
+
+        <div class="card">
+          <h2>🔍 検出されたポイント</h2>
+          <div id="issue-list" class="issue-list"></div>
+        </div>
+
+        <div class="card">
+          <h2>👨‍🏫 AI診断士による、やさしい解説</h2>
+          <div id="ai-explain"></div>
+        </div>
+
+        <div class="card" id="lead-card">
+          <h2>📨 専門家に相談する（任意）</h2>
+          <div class="hint">この診断結果をもとに、担当者から詳しいご説明やお見積りのご相談を受けたい方はこちらからご連絡ください。</div>
+          <form id="lead-form">
+            <div class="form-group">
+              <label>お名前</label>
+              <input type="text" id="lead-name" placeholder="山田 太郎">
+            </div>
+            <div class="form-group">
+              <label>電話番号 または メールアドレス</label>
+              <input type="text" id="lead-contact" placeholder="090-1234-5678 / example@mail.com">
+            </div>
+            <div class="form-group">
+              <label>ご質問・ご要望（任意）</label>
+              <input type="text" id="lead-memo" placeholder="現地調査の希望日など">
+            </div>
+            <label class="consent-row">
+              <input type="checkbox" id="lead-consent">
+              <span>入力内容と診断結果を送信し、担当者からの連絡を受け取ることに同意します。</span>
+            </label>
+            <button type="submit" class="btn-primary">この内容で相談する</button>
+            <div class="lead-status" id="lead-status"></div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>✉️ 業者への確認フレーズ（コピーしてそのまま送れます）</h2>
+          <p style="font-size: 12px; color: #666; margin-top: 0;">気になる点をLINEやメールでそのまま質問できる文章です。カテゴリごとにまとめています。</p>
+          <div id="template-container"></div>
         </div>
       </div>
 
-      <div class="scope-item">
-        <label class="check-item"><input type="checkbox" id="chk-roof" onchange="onScopeChange()"> 屋根塗装</label>
-        <div class="scope-area" id="area-roof-wrap">
-          <div class="area-row">
-            <label>施工面積</label>
-            <input type="number" id="area-roof" min="1" step="0.1" value="60" oninput="onAreaChange()">
-            <span>㎡</span>
-            <span class="tsubo-hint" id="tsubo-roof">（約18.2坪）</span>
-          </div>
+      <footer class="note">
+        ※本ツールはご自身で見積もりを確認するための簡易的な目安です。金額は地域や現場状況により変動します。最終的なご判断は、複数社への相見積もりや専門家への現地調査のご依頼をおすすめします。
+      </footer>
+    </section>
+
+    <section id="tab-history" class="tab-panel">
+      <div class="card">
+        <h2>📋 診断履歴</h2>
+        <div class="hint">この端末に保存された、過去の診断結果の一覧です（他の端末とは共有されません）。</div>
+        <div class="history-actions" id="history-actions">
+          <button type="button" class="btn-danger-text" id="history-clear-btn">履歴をすべて削除</button>
         </div>
+        <div id="history-list"></div>
       </div>
+    </section>
+  </main>
 
-      <div class="scope-item">
-        <label class="check-item"><input type="checkbox" id="chk-balcony" onchange="onScopeChange()"> バルコニー防水</label>
-        <div class="scope-area" id="area-balcony-wrap">
-          <div class="area-row">
-            <label>施工面積</label>
-            <input type="number" id="area-balcony" min="1" step="0.1" value="8" oninput="onAreaChange()">
-            <span>㎡</span>
-            <span class="tsubo-hint" id="tsubo-balcony">（約2.4坪）</span>
-          </div>
-        </div>
-      </div>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="diagnose"><span class="ico">🔍</span>診断する</button>
+    <button class="nav-btn" data-tab="history"><span class="ico">📋</span>診断履歴</button>
+  </nav>
 
-      <div class="scope-item">
-        <label class="check-item"><input type="checkbox" id="chk-rooftop" onchange="onScopeChange()"> 屋上防水</label>
-        <div class="scope-area" id="area-rooftop-wrap">
-          <div class="area-row">
-            <label>施工面積</label>
-            <input type="number" id="area-rooftop" min="1" step="0.1" value="50" oninput="onAreaChange()">
-            <span>㎡</span>
-            <span class="tsubo-hint" id="tsubo-rooftop">（約15.1坪）</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>STEP3. 見積もり提示総額</h2>
-      <div class="hint">見積書に書かれている「合計金額（税込）」を入力してください。</div>
-      <div class="form-group">
-        <label>見積もり提示総額（万円）</label>
-        <input type="number" id="total-price" value="135" min="0.1" step="0.1" required>
-      </div>
-      <div class="form-group">
-        <label>使われている塗料のグレード（分かれば選択）<span id="grade-auto" class="auto-tag" style="display:none;">AIが検出</span></label>
-        <select id="paint-grade">
-          <option value="unknown">わからない・書いていない</option>
-          <option value="urethane">ウレタン（一般的なグレード）</option>
-          <option value="silicon" selected>シリコン（人気の標準グレード）</option>
-          <option value="fluorine">フッ素（高耐久グレード）</option>
-          <option value="inorganic">無機（最高耐久グレード）</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>値引き額（万円）※見積書に大幅値引きがあれば入力</label>
-        <input type="number" id="discount-amount" value="0" min="0" step="0.1">
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>STEP4. 見積書の記載内容チェック</h2>
-      <div class="hint">見積書を見て、当てはまるものにチェックを入れてください（AIが読み取った場合は自動でチェックされています）。</div>
-      <div class="check-grid">
-        <label class="check-item">
-          <input type="checkbox" id="chk-isshiki">
-          <span>「〇〇工事一式」という書き方が多く、㎡やmなどの数量がほとんど書かれていない<br><span style="color:#a0aec0;">（→内訳が分からず、何にいくら使われているか不透明という意味です）</span></span>
-        </label>
-        <label class="check-item" id="row-no-paint-name">
-          <input type="checkbox" id="chk-no-paint-name">
-          <span>使用する塗料の「メーカー名」や「正式な商品名」が書かれていない<br><span style="color:#a0aec0;">（→単に「シリコン塗料」とだけ書かれ、どこの会社の何という商品か不明ということです）</span></span>
-        </label>
-        <label class="check-item" id="row-no-repair">
-          <input type="checkbox" id="chk-no-repair">
-          <span>ひび割れ補修やシーリング（コーキング）、下地の処理についての記載がない<br><span style="color:#a0aec0;">（→家で言う「化粧下地」にあたる工程で、ここを省くと数年で傷みが再発しやすくなります）</span></span>
-        </label>
-        <label class="check-item" id="row-no-drain">
-          <input type="checkbox" id="chk-no-drain">
-          <span>防水工事なのに「改修ドレン」（排水口の交換）についての記載がない<br><span style="color:#a0aec0;">（→排水口の劣化を放置すると雨漏りの直接原因になります）</span></span>
-        </label>
-        <label class="check-item">
-          <input type="checkbox" id="chk-pushy">
-          <span>「本日契約なら◯◯円引き」「今だけ足場代無料」など、契約を急がせる言葉がある</span>
-        </label>
-      </div>
-    </div>
-
-    <button type="submit" class="btn-submit">この内容で診断する</button>
-  </form>
-
-  <div id="result-area">
-    <div id="score-box" class="score-box">
-      <div class="score-title" id="score-title">診断結果</div>
-      <div class="score-badge" id="score-badge">75点</div>
-      <div class="gauge-wrap"><div class="gauge-fill" id="gauge-fill" style="width:100%;"></div><div class="gauge-marker" id="gauge-marker" style="left:75%;"></div></div>
-      <div id="score-desc" style="font-size: 14px;"></div>
-      <div class="price-compare" id="price-compare"></div>
-    </div>
-
-    <div class="card">
-      <h2>🔍 検出されたポイント</h2>
-      <div id="issue-list" class="issue-list"></div>
-    </div>
-
-    <div class="card">
-      <h2>👨‍🏫 AI診断士による、やさしい解説</h2>
-      <div id="ai-explain"></div>
-    </div>
-
-    <div class="card">
-      <h2>✉️ 業者への確認フレーズ（コピーしてそのまま送れます）</h2>
-      <p style="font-size: 12px; color: #666; margin-top: 0;">気になる点をLINEやメールでそのまま質問できる文章です。カテゴリごとにまとめています。</p>
-      <div id="template-container"></div>
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-sheet">
+      <button type="button" class="modal-close" onclick="closeModal()" aria-label="閉じる"></button>
+      <div id="modal-body"></div>
     </div>
   </div>
-
-  <footer class="note">
-    ※本ツールはご自身で見積もりを確認するための簡易的な目安です。金額は地域や現場状況により変動します。最終的なご判断は、複数社への相見積もりや専門家への現地調査のご依頼をおすすめします。
-  </footer>
 </div>
 
-<script>
-/* ==================== 設定値（相場・キーワード辞書） ==================== */
-const SQM_PER_TSUBO = 3.30578;
-
-// 施工1㎡あたりの相場（円）。塗装はグレードごとに変動、防水は箇所ごとに変動。
-const PAINT_RATE = {
-  urethane:  { min: 2500, max: 3500 },
-  silicon:   { min: 3000, max: 4000 },
-  fluorine:  { min: 4000, max: 5000 },
-  inorganic: { min: 4500, max: 6000 },
-  unknown:   { min: 3000, max: 4500 }
-};
-const ROOF_FACTOR = 0.85; // 屋根は外壁よりやや単価が下がる目安
-const WATERPROOF_RATE = {
-  balcony: { min: 5500, max: 9000 },
-  rooftop: { min: 4500, max: 7500 }
-};
-
-const MANUFACTURER_KEYWORDS = [
-  "日本ペイント","関西ペイント","エスケー化研","SK化研","アステックペイント","アステック",
-  "プレマテックス","日進産業","ガイナ","大日本塗料","水谷ペイント","菊水化学","アトミクス",
-  "エーゲンダイヤ","トウペ","中国塗料","ロックペイント","四国化成"
-];
-const PAINT_PRODUCT_KEYWORDS = [
-  "パーフェクトトップ","プレミアムシリコン","超低汚染リファイン","セラMシリコン","ラジカルガード",
-  "ナノコンポジット","クリーンマイルド","ファインパーフェクト","ジンクシリコン","エスケーハイフッソ",
-  "サーモアイ","ダイナミックトップ","水性シリコン"
-];
-const GRADE_KEYWORDS = [
-  { grade: "inorganic", words: ["無機","むき","ハイブリッド無機"] },
-  { grade: "fluorine",  words: ["フッ素","ふっ素"] },
-  { grade: "silicon",   words: ["シリコン"] },
-  { grade: "urethane",  words: ["ウレタン塗料","ウレタン系"] }
-];
-const REPAIR_KEYWORDS = ["ケレン","クラック","シーリング","コーキング","下地補修","下地調整","サーフェサー","カチオン","目地補修","ひび割れ補修"];
-const DRAIN_KEYWORDS = ["改修ドレン","ドレン交換","ドレン改修","ドレン"];
-const WALL_KEYWORDS = ["外壁塗装","外壁"];
-const ROOF_KEYWORDS = ["屋根塗装","屋根"];
-const BALCONY_KEYWORDS = ["バルコニー防水","ベランダ防水","バルコニー","ベランダ"];
-const ROOFTOP_KEYWORDS = ["屋上防水","屋上"];
-const WATERPROOF_METHOD_KEYWORDS = ["ウレタン防水","FRP防水","塩ビシート","シート防水","通気緩衝","トップコート"];
-
-/* ==================== UI: 面積欄の表示切り替え ==================== */
-function onScopeChange() {
-  toggle('chk-wall', 'area-wall-wrap');
-  toggle('chk-roof', 'area-roof-wrap');
-  toggle('chk-balcony', 'area-balcony-wrap');
-  toggle('chk-rooftop', 'area-rooftop-wrap');
-
-  const paintActive = document.getElementById('chk-wall').checked || document.getElementById('chk-roof').checked;
-  const waterActive = document.getElementById('chk-balcony').checked || document.getElementById('chk-rooftop').checked;
-
-  setRowEnabled('row-no-paint-name', paintActive);
-  setRowEnabled('row-no-repair', paintActive);
-  setRowEnabled('row-no-drain', waterActive);
-}
-function toggle(chkId, wrapId) {
-  document.getElementById(wrapId).classList.toggle('show', document.getElementById(chkId).checked);
-}
-function setRowEnabled(rowId, enabled) {
-  const row = document.getElementById(rowId);
-  row.classList.toggle('disabled', !enabled);
-  if (!enabled) row.querySelector('input[type=checkbox]').checked = false;
-}
-function onAreaChange() {
-  updateTsuboHint('area-wall','tsubo-wall');
-  updateTsuboHint('area-roof','tsubo-roof');
-  updateTsuboHint('area-balcony','tsubo-balcony');
-  updateTsuboHint('area-rooftop','tsubo-rooftop');
-}
-function updateTsuboHint(inputId, hintId) {
-  const v = parseFloat(document.getElementById(inputId).value) || 0;
-  document.getElementById(hintId).innerText = `（約${(v / SQM_PER_TSUBO).toFixed(1)}坪）`;
-}
-
-/* ==================== サンプルデータ ==================== */
-function loadSample(type) {
-  document.getElementById('chk-wall').checked = true;
-  document.getElementById('chk-roof').checked = false;
-  document.getElementById('chk-balcony').checked = false;
-  document.getElementById('chk-rooftop').checked = true;
-
-  if (type === 'danger') {
-    document.getElementById('area-wall').value = 130;
-    document.getElementById('area-rooftop').value = 45;
-    document.getElementById('total-price').value = 210;
-    document.getElementById('paint-grade').value = 'silicon';
-    document.getElementById('discount-amount').value = 40;
-    setChecks(true, true, true, true, true);
-  } else if (type === 'cheap') {
-    document.getElementById('area-wall').value = 140;
-    document.getElementById('area-rooftop').value = 50;
-    document.getElementById('total-price').value = 68;
-    document.getElementById('paint-grade').value = 'urethane';
-    document.getElementById('discount-amount').value = 0;
-    setChecks(true, false, true, true, false);
-  } else if (type === 'good') {
-    document.getElementById('area-wall').value = 125;
-    document.getElementById('area-rooftop').value = 40;
-    document.getElementById('total-price').value = 148;
-    document.getElementById('paint-grade').value = 'fluorine';
-    document.getElementById('discount-amount').value = 3;
-    setChecks(false, false, false, false, false);
-  }
-  onScopeChange();
-  onAreaChange();
-  document.getElementById('ai-report').style.display = 'none';
-}
-function setChecks(isshiki, noPaint, noRepair, noDrain, pushy) {
-  document.getElementById('chk-isshiki').checked = isshiki;
-  document.getElementById('chk-no-paint-name').checked = noPaint;
-  document.getElementById('chk-no-repair').checked = noRepair;
-  document.getElementById('chk-no-drain').checked = noDrain;
-  document.getElementById('chk-pushy').checked = pushy;
-}
-
-/* ==================== ファイル読み込み・OCR ==================== */
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
-dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-});
-fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
-
-if (window['pdfjsLib']) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
-
-function setScanStatus(text, percent) {
-  const statusEl = document.getElementById('scan-status');
-  const progEl = document.getElementById('scan-progress');
-  const barEl = document.getElementById('scan-progress-bar');
-  if (text === null) { statusEl.style.display = 'none'; progEl.style.display = 'none'; return; }
-  statusEl.style.display = 'block';
-  statusEl.innerText = text;
-  if (typeof percent === 'number') {
-    progEl.style.display = 'block';
-    barEl.style.width = Math.max(0, Math.min(100, percent)) + '%';
-  }
-}
-
-async function handleFile(file) {
-  const isPdf = file.type === 'application/pdf';
-  const isImage = file.type.startsWith('image/');
-
-  if (!isPdf && !isImage) {
-    alert('画像（JPG/PNG）またはPDFファイルを選択してください。');
-    return;
-  }
-  if (isPdf && typeof pdfjsLib === 'undefined') {
-    alert('PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。\n\n・インターネットに接続されているかご確認のうえ、ページを再読み込みしてお試しください。\n・改善しない場合は、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
-    return;
-  }
-  if (isImage && typeof Tesseract === 'undefined') {
-    alert('写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。\n\n・インターネットに接続されているかご確認のうえ、ページを再読み込みしてお試しください。\n・改善しない場合は、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
-    return;
-  }
-
-  try {
-    setScanStatus('見積書を読み込んでいます…', 5);
-    const extractPromise = isPdf ? extractTextFromPDF(file) : extractTextFromImage(file);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000));
-    const text = await Promise.race([extractPromise, timeoutPromise]);
-    setScanStatus('内容を解析しています…', 95);
-    const data = analyzeText(normalizeText(text));
-    applyExtractedData(data);
-    setScanStatus(null);
-  } catch (err) {
-    console.error(err);
-    setScanStatus(null);
-    if (err && err.message === 'TIMEOUT') {
-      alert('30秒待っても読み込みが完了しませんでした。\n\nこのファイルの自動読み取りはうまくいかない可能性があります。お手数ですが、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
-    } else {
-      alert('読み込み中にエラーが発生しました。お手数ですが、下の「文字を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (err && err.message ? err.message : err) + ')');
-    }
-  }
-}
-
-// file:// で開いた場合、CDN上のワーカースクリプトをそのまま指定すると
-// ブラウザのセキュリティ制限でWorkerの生成に失敗することがある。
-// 一度スクリプトを取得してBlob化することで「同一オリジン」として扱わせ、回避する。
-let pdfWorkerBlobUrlPromise = null;
-function getPdfWorkerSrc() {
-  if (!pdfWorkerBlobUrlPromise) {
-    const cdnUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    pdfWorkerBlobUrlPromise = fetch(cdnUrl)
-      .then(res => { if (!res.ok) throw new Error('status ' + res.status); return res.text(); })
-      .then(code => URL.createObjectURL(new Blob([code], { type: 'text/javascript' })))
-      .catch(err => { console.warn('PDFワーカーのBlob化に失敗。直接CDNを指定します。', err); return cdnUrl; });
-  }
-  return pdfWorkerBlobUrlPromise;
-}
-
-let tesseractWorkerBlobUrlPromise = null;
-function getTesseractWorkerPath() {
-  if (!tesseractWorkerBlobUrlPromise) {
-    const cdnUrl = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/worker.min.js';
-    tesseractWorkerBlobUrlPromise = fetch(cdnUrl)
-      .then(res => { if (!res.ok) throw new Error('status ' + res.status); return res.text(); })
-      .then(code => URL.createObjectURL(new Blob([code], { type: 'text/javascript' })))
-      .catch(err => { console.warn('OCRワーカーのBlob化に失敗。既定の読み込み方法を使用します。', err); return null; });
-  }
-  return tesseractWorkerBlobUrlPromise;
-}
-
-async function extractTextFromPDF(file) {
-  const buf = await file.arrayBuffer();
-  pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  let text = '';
-  const pageCount = Math.min(pdf.numPages, 5);
-  for (let i = 1; i <= pageCount; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(it => it.str).join(' ') + '\n';
-  }
-  // テキストがほぼ無い＝スキャン画像PDFの可能性 → OCRへフォールバック
-  if (text.replace(/\s/g, '').length < 20) {
-    setScanStatus('画像として認識しています（少し時間がかかります）…', 20);
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 2.0 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width; canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    text = await ocrCanvas(canvas);
-  }
-  return text;
-}
-
-async function extractTextFromImage(file) {
-  return await ocrFile(file);
-}
-
-async function ocrFile(file) {
-  const workerPath = await getTesseractWorkerPath();
-  const options = {
-    logger: m => {
-      if (m.status === 'recognizing text') {
-        setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70));
-      }
-    }
-  };
-  if (workerPath) options.workerPath = workerPath;
-  const { data } = await Tesseract.recognize(file, 'jpn+eng', options);
-  return data.text;
-}
-async function ocrCanvas(canvas) {
-  const workerPath = await getTesseractWorkerPath();
-  const options = {
-    logger: m => {
-      if (m.status === 'recognizing text') {
-        setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70));
-      }
-    }
-  };
-  if (workerPath) options.workerPath = workerPath;
-  const { data } = await Tesseract.recognize(canvas.toDataURL('image/png'), 'jpn+eng', options);
-  return data.text;
-}
-
-function analyzePastedText() {
-  const raw = document.getElementById('paste-text').value;
-  if (!raw.trim()) { alert('文章を貼り付けてください。'); return; }
-  const data = analyzeText(normalizeText(raw));
-  applyExtractedData(data);
-}
-
-/* ==================== テキスト正規化・抽出ロジック ==================== */
-function normalizeText(text) {
-  // 全角数字→半角
-  text = text.replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
-  // 面積の単位ゆれを統一
-  text = text.replace(/平方メートル|平米|㎡|m2|m²/g, 'm2');
-  // 余分な空白を軽く整理（数字と単位がくっつくよう）
-  text = text.replace(/[，]/g, ',');
-  return text;
-}
-
-function analyzeText(text) {
-  const result = {
-    totalPriceMan: null, areaSqm: null, grade: null, manufacturer: null,
-    isshikiCount: 0, hasRepairKeywords: false, hasDrainKeyword: false,
-    hasWall: false, hasRoof: false, hasBalcony: false, hasRooftop: false,
-    hasWaterproofMethod: false, foundKeywords: []
-  };
-
-  // ---- 総額の抽出 ----
-  let priceMatch = text.match(/(?:御見積合計|見積合計|合計金額|ご請求金額|総額|税込)[^0-9]{0,10}([0-9][0-9,]{4,})\s*円/);
-  if (!priceMatch) priceMatch = text.match(/([0-9][0-9,]{4,})\s*円\s*(?:（?税込）?)/);
-  if (priceMatch) {
-    result.totalPriceMan = Math.round(parseInt(priceMatch[1].replace(/,/g, ''), 10) / 1000) / 10;
-  } else {
-    // フェールセーフ：文中で最も大きい「円」付き金額（10万円以上）を採用
-    const all = [...text.matchAll(/([0-9][0-9,]{4,})\s*円/g)].map(m => parseInt(m[1].replace(/,/g, ''), 10)).filter(n => n >= 100000);
-    if (all.length) result.totalPriceMan = Math.round(Math.max(...all) / 1000) / 10;
-  }
-
-  // ---- 面積の抽出（㎡優先、なければ坪から換算）----
-  let areaMatch = text.match(/(?:施工面積|延床面積|塗装面積|面積)[^0-9]{0,6}([0-9]+(?:\.[0-9]+)?)\s*m2/);
-  if (!areaMatch) areaMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*m2/);
-  if (areaMatch) {
-    result.areaSqm = parseFloat(areaMatch[1]);
-  } else {
-    const tsuboMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*坪/);
-    if (tsuboMatch) result.areaSqm = Math.round(parseFloat(tsuboMatch[1]) * SQM_PER_TSUBO * 10) / 10;
-  }
-
-  // ---- 塗料グレード ----
-  for (const g of GRADE_KEYWORDS) {
-    if (g.words.some(w => text.includes(w))) { result.grade = g.grade; break; }
-  }
-
-  // ---- メーカー・商品名 ----
-  for (const m of MANUFACTURER_KEYWORDS) { if (text.includes(m)) { result.manufacturer = m; result.foundKeywords.push(m); break; } }
-  if (!result.manufacturer) {
-    for (const p of PAINT_PRODUCT_KEYWORDS) { if (text.includes(p)) { result.manufacturer = p; result.foundKeywords.push(p); break; } }
-  }
-
-  // ---- 一式の出現回数 ----
-  result.isshikiCount = (text.match(/一式/g) || []).length;
-
-  // ---- 下地補修キーワード ----
-  result.hasRepairKeywords = REPAIR_KEYWORDS.some(k => text.includes(k));
-  // ---- ドレン ----
-  result.hasDrainKeyword = DRAIN_KEYWORDS.some(k => text.includes(k));
-  // ---- 防水工法 ----
-  result.hasWaterproofMethod = WATERPROOF_METHOD_KEYWORDS.some(k => text.includes(k));
-
-  // ---- 工事範囲の推定 ----
-  result.hasWall = WALL_KEYWORDS.some(k => text.includes(k));
-  result.hasRoof = ROOF_KEYWORDS.some(k => text.includes(k));
-  result.hasBalcony = BALCONY_KEYWORDS.some(k => text.includes(k));
-  result.hasRooftop = ROOFTOP_KEYWORDS.some(k => text.includes(k)) && !result.hasBalcony;
-
-  return result;
-}
-
-function applyExtractedData(d) {
-  const reportLines = [];
-
-  if (d.totalPriceMan) {
-    document.getElementById('total-price').value = d.totalPriceMan;
-    reportLines.push(`💰 見積もり総額として <b>約${d.totalPriceMan}万円</b> を読み取りました。金額欄と一致しているか、念のためご確認ください。`);
-  } else {
-    reportLines.push(`💰 総額をうまく読み取れませんでした。お手数ですが「見積もり提示総額」欄に手入力をお願いします。`);
-  }
-
-  if (d.areaSqm) {
-    reportLines.push(`📐 施工面積として <b>約${d.areaSqm}㎡</b> を読み取りました。該当する工事範囲の面積欄に反映しています。`);
-  }
-
-  if (d.hasWall) { document.getElementById('chk-wall').checked = true; if (d.areaSqm) document.getElementById('area-wall').value = d.areaSqm; }
-  if (d.hasRoof) { document.getElementById('chk-roof').checked = true; if (d.areaSqm && !d.hasWall) document.getElementById('area-roof').value = d.areaSqm; }
-  if (d.hasBalcony) { document.getElementById('chk-balcony').checked = true; if (d.areaSqm && !d.hasWall && !d.hasRoof) document.getElementById('area-balcony').value = d.areaSqm; }
-  if (d.hasRooftop) { document.getElementById('chk-rooftop').checked = true; if (d.areaSqm && !d.hasWall && !d.hasRoof && !d.hasBalcony) document.getElementById('area-rooftop').value = d.areaSqm; }
-  if (!d.hasWall && !d.hasRoof && !d.hasBalcony && !d.hasRooftop) {
-    // 何も検出できなければ、初期値の外壁塗装のみ有効化しておく
-    document.getElementById('chk-wall').checked = true;
-  }
-  onScopeChange();
-  onAreaChange();
-
-  if (d.grade) {
-    document.getElementById('paint-grade').value = d.grade;
-    document.getElementById('grade-auto').style.display = 'inline-block';
-    const gradeName = {urethane:'ウレタン', silicon:'シリコン', fluorine:'フッ素', inorganic:'無機'}[d.grade];
-    reportLines.push(`🎨 塗料のグレードとして <b>「${gradeName}」</b> という記載を見つけました。グレードによって適正相場が変わるため、自動で反映しています。`);
-  } else {
-    document.getElementById('grade-auto').style.display = 'none';
-  }
-
-  if (d.manufacturer) {
-    document.getElementById('chk-no-paint-name').checked = false;
-    reportLines.push(`🏭 塗料メーカー・商品名として <b>「${d.manufacturer}」</b> の記載を確認しました。メーカー名がはっきりしているのは良い傾向です。`);
-  } else {
-    reportLines.push(`🏭 塗料のメーカー名・正式な商品名は見つかりませんでした。「◯◯シリコン塗料」のような曖昧な表記のみの可能性があります。`);
-  }
-
-  document.getElementById('chk-isshiki').checked = d.isshikiCount >= 4;
-  if (d.isshikiCount > 0) {
-    reportLines.push(`📋 見積書の中に「一式」という言葉が <b>${d.isshikiCount}回</b> 見つかりました。${d.isshikiCount >= 4 ? 'やや多めなので、内訳の開示を求めることをおすすめします。' : 'この程度であれば大きな問題ではないことが多いです。'}`);
-  }
-
-  document.getElementById('chk-no-repair').checked = !d.hasRepairKeywords;
-  if (d.hasRepairKeywords) {
-    reportLines.push(`🛠️ ひび割れ補修・シーリングなど下地処理に関する記載を確認できました。`);
-  }
-
-  const waterActiveNow = document.getElementById('chk-balcony').checked || document.getElementById('chk-rooftop').checked;
-  if (waterActiveNow) {
-    document.getElementById('chk-no-drain').checked = !d.hasDrainKeyword;
-    if (d.hasDrainKeyword) reportLines.push(`🚿 防水工事に必要な「改修ドレン」についての記載を確認できました。`);
-  }
-
-  const reportBox = document.getElementById('ai-report');
-  reportBox.innerHTML = `<h3>🤖 AI読み取りレポート</h3><ul>${reportLines.map(l => `<li>${l}</li>`).join('')}</ul><p style="margin:8px 0 0;color:#a0733a;font-size:11px;">※文字認識には誤読の可能性があります。診断前に必ず内容をご確認・修正ください。</p>`;
-  reportBox.style.display = 'block';
-  reportBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-/* ==================== 診断ロジック ==================== */
-function getPaintRateRange(grade) {
-  const base = PAINT_RATE[grade] || PAINT_RATE.unknown;
-  return base;
-}
-
-function calculateDiagnostic(e) {
-  e.preventDefault();
-
-  const wallOn = document.getElementById('chk-wall').checked;
-  const roofOn = document.getElementById('chk-roof').checked;
-  const balconyOn = document.getElementById('chk-balcony').checked;
-  const rooftopOn = document.getElementById('chk-rooftop').checked;
-  const paintActive = wallOn || roofOn;
-  const waterActive = balconyOn || rooftopOn;
-
-  if (!paintActive && !waterActive) {
-    alert('工事の内容（外壁塗装・屋根塗装・バルコニー防水・屋上防水のいずれか）を1つ以上選んでください。');
-    return;
-  }
-
-  const areaWall = parseFloat(document.getElementById('area-wall').value) || 0;
-  const areaRoof = parseFloat(document.getElementById('area-roof').value) || 0;
-  const areaBalcony = parseFloat(document.getElementById('area-balcony').value) || 0;
-  const areaRooftop = parseFloat(document.getElementById('area-rooftop').value) || 0;
-
-  const price = parseFloat(document.getElementById('total-price').value);
-  const grade = document.getElementById('paint-grade').value;
-  const discount = parseFloat(document.getElementById('discount-amount').value) || 0;
-
-  const isIsshiki = document.getElementById('chk-isshiki').checked;
-  const isNoPaintName = document.getElementById('chk-no-paint-name').checked && paintActive;
-  const isNoRepair = document.getElementById('chk-no-repair').checked && paintActive;
-  const isNoDrain = document.getElementById('chk-no-drain').checked && waterActive;
-  const isPushy = document.getElementById('chk-pushy').checked;
-
-  // ---- 相場計算（円）----
-  const paintRate = getPaintRateRange(grade);
-  let expectedMin = 0, expectedMax = 0;
-  if (wallOn) { expectedMin += areaWall * paintRate.min; expectedMax += areaWall * paintRate.max; }
-  if (roofOn) { expectedMin += areaRoof * paintRate.min * ROOF_FACTOR; expectedMax += areaRoof * paintRate.max * ROOF_FACTOR; }
-  if (balconyOn) { expectedMin += areaBalcony * WATERPROOF_RATE.balcony.min; expectedMax += areaBalcony * WATERPROOF_RATE.balcony.max; }
-  if (rooftopOn) { expectedMin += areaRooftop * WATERPROOF_RATE.rooftop.min; expectedMax += areaRooftop * WATERPROOF_RATE.rooftop.max; }
-
-  const expectedMinMan = Math.round(expectedMin / 1000) / 10;
-  const expectedMaxMan = Math.round(expectedMax / 1000) / 10;
-
-  let score = 100;
-  const issues = [];
-  const qGeneral = [], qPaint = [], qWater = [];
-
-  // ---- 価格診断 ----
-  if (expectedMinMan > 0) {
-    if (price < expectedMinMan * 0.75) {
-      score -= 25;
-      issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり安い金額です（手抜き・工程省略のリスク）', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それを大きく下回っています。下地処理や塗装の回数、必要な部材が省かれている可能性があります。` });
-      qGeneral.push('・相場より大変お手頃なお見積りですが、その分どこかの工程を簡略化されているのでしょうか？下地処理や塗り回数など、含まれる工程を具体的に教えてください。');
-    } else if (price > expectedMaxMan * 1.3) {
-      score -= 15;
-      issues.push({ level: 'warn', tag: '価格', title: '相場よりやや高めの金額です', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それより高めの水準です。中間業者を挟んでいる場合や、諸経費が多めに計上されている可能性があります。` });
-      qGeneral.push('・相場と比較してやや高めに感じましたが、金額の内訳（諸経費や仮設費など）を詳しく教えていただけますか？');
-    } else {
-      issues.push({ level: 'good', tag: '価格', title: '金額は相場の範囲内です', desc: `お見積り金額（${price}万円）は、選択された工事内容における適正相場（約${expectedMinMan}万円〜${expectedMaxMan}万円）の範囲に収まっています。` });
-    }
-  }
-
-  // ---- 一式表記 ----
-  if (isIsshiki) {
-    score -= 15;
-    issues.push({ level: 'warn', tag: '透明度', title: '「一式」表記が多く、内訳が不透明です', desc: '数量（㎡やmなど）が書かれていないと、必要な量の材料が使われているか、施主側では確認できません。後からの追加請求トラブルの元にもなります。' });
-    qGeneral.push('・「一式」となっている項目について、数量（㎡・m）ごとの内訳を出していただくことは可能でしょうか？');
-  }
-
-  // ---- 塗装関連 ----
-  if (paintActive && isNoPaintName) {
-    score -= 12;
-    issues.push({ level: 'warn', tag: '塗装', title: '塗料のメーカー名・商品名が不明です', desc: 'メーカー名や正式な商品名が分からないと、実際にどのグレードの塗料が使われるのか確認できません。安価な塗料に差し替えられるリスクもあります。' });
-    qPaint.push('・使用される塗料の「メーカー名」と「正式な商品名」を教えてください。');
-  }
-  if (paintActive && isNoRepair) {
-    score -= 18;
-    issues.push({ level: 'danger', tag: '塗装', title: '下地補修・シーリングの記載がありません', desc: '塗装はいわば「お化粧」で、下地補修はその前段階の「肌のお手入れ」にあたります。ここを省いて上から塗るだけだと、数年でひび割れや剥がれが再発しやすくなります。' });
-    qPaint.push('・ひび割れ補修や、目地のシーリング（打ち替え・増し打ち）、鉄部のケレン処理の費用は含まれていますか？');
-  }
-
-  // ---- 防水関連 ----
-  if (waterActive && isNoDrain) {
-    score -= 15;
-    issues.push({ level: 'warn', tag: '防水', title: '改修ドレン（排水口）の記載がありません', desc: '防水工事において雨漏りが最も発生しやすいのが排水口（ドレン）まわりです。ここの交換・改修が含まれていないと、数年後に雨漏りするリスクが残ります。' });
-    qWater.push('・防水工事の明細に「改修ドレンの設置・交換」の費用は含まれていますか？');
-  }
-
-  // ---- 値引き・煽り文言 ----
-  if (discount >= 10 || isPushy) {
-    score -= 15;
-    issues.push({ level: 'danger', tag: '契約', title: '大幅な値引きや契約を急がせる表現があります', desc: 'あらかじめ金額を高く設定しておき、大幅値引きで「お得感」を演出して即決を迫る手口は、悪質な業者に多いパターンです。値引き自体が悪いわけではありませんが、根拠を確認しましょう。' });
-    qGeneral.push('・大きな値引きをしていただいていますが、値引き前の金額の根拠（内訳）を教えていただけますか？また、今日契約しない場合は金額が変わりますか？');
-  } else if (discount > 0) {
-    issues.push({ level: 'good', tag: '契約', title: '値引きの範囲は常識的です', desc: '少額の端数調整程度の値引きであれば、特別に警戒する必要はありません。' });
-  }
-
-  score = Math.max(0, Math.min(100, score));
-
-  /* ---- 結果表示 ---- */
-  const resultArea = document.getElementById('result-area');
-  const scoreBox = document.getElementById('score-box');
-  const scoreBadge = document.getElementById('score-badge');
-  const scoreDesc = document.getElementById('score-desc');
-  const scoreTitle = document.getElementById('score-title');
-  const gaugeMarker = document.getElementById('gauge-marker');
-  const priceCompare = document.getElementById('price-compare');
-
-  scoreBadge.innerText = score + '点';
-  gaugeMarker.style.left = score + '%';
-  resultArea.style.display = 'block';
-
-  let persona = '';
-  if (score >= 80) {
-    scoreBox.className = 'score-box good';
-    scoreTitle.innerText = '🟢 総合判定：適正（健康優良児タイプ）';
-    scoreDesc.innerText = '記載内容・金額ともに大きな問題は見られません。安心して検討を進めやすい見積もりです。';
-    persona = 'とても良いお見積りですね！内訳もしっかりしていて、金額も相場の範囲内です。人間ドックで例えるなら「健康優良児」タイプ。とはいえ最終決定の前には、必ず他の業者とも比較（相見積もり）することをおすすめします。';
-  } else if (score >= 50) {
-    scoreBox.className = 'score-box warn';
-    scoreTitle.innerText = '🟡 総合判定：要確認（もう少し検査が必要）';
-    scoreDesc.innerText = 'いくつか気になる点があります。契約前に、下の「確認フレーズ」を使って業者に質問してみましょう。';
-    persona = 'いくつか気になる項目が見つかりました。人間ドックで言う「要精密検査」のような状態です。悪い業者と決まったわけではなく、単に見積書の書き方が省略されているだけの場合もよくあります。まずは下の質問フレーズを使って、業者に確認してみてください。';
-  } else {
-    scoreBox.className = 'score-box danger';
-    scoreTitle.innerText = '🔴 総合判定：注意（リスクが高い可能性）';
-    scoreDesc.innerText = '不透明な項目や、工程の省略・高額請求のリスクが高い見積もりです。契約を急がず、他社に相見積もりを取ることを強くおすすめします。';
-    persona = '正直に申し上げると、少し心配な点が多いお見積りです。「安いから」「今すぐ契約しないと損」といった言葉に惑わされず、一度立ち止まって、他の会社にも同じ条件で見積もりを依頼（相見積もり）することを強くおすすめします。工事は一生に何度もあるものではないからこそ、慎重に選びましょう。';
-  }
-
-  if (expectedMinMan > 0) {
-    priceCompare.innerText = `適正相場の目安：約 ${expectedMinMan}万円 〜 ${expectedMaxMan}万円（今回の入力条件に基づく概算）`;
-  } else {
-    priceCompare.innerText = '';
-  }
-
-  const issueList = document.getElementById('issue-list');
-  issueList.innerHTML = issues.map(i => `
-    <div class="issue-item ${i.level}">
-      <strong>${i.title}</strong><span class="tag">${i.tag}</span>
-      <div style="margin-top: 4px; color: #4a5568;">${i.desc}</div>
-    </div>
-  `).join('') || '<p style="font-size:13px;color:#718096;">特筆すべき懸念点は見つかりませんでした。</p>';
-
-  document.getElementById('ai-explain').innerHTML = `<p><span class="persona">AI診断士：</span>${persona}</p>`;
-
-  /* ---- 確認フレーズ ---- */
-  const container = document.getElementById('template-container');
-  let html = '';
-  html += buildTemplateSection('お見積り全体について', qGeneral, 'general');
-  if (paintActive) html += buildTemplateSection('塗装工事について', qPaint, 'paint');
-  if (waterActive) html += buildTemplateSection('防水工事について', qWater, 'water');
-  if (!qGeneral.length && !qPaint.length && !qWater.length) {
-    html = `<div class="template-section"><div class="template-box" id="tmpl-none">特に気になる点は見つかりませんでした。念のため、施工時の工程表や保証内容について確認しておくと安心です。\n\n・工事の工程表（何日目に何を行うか）を教えていただけますか？\n・保証書は発行していただけますか？保証の対象範囲も教えてください。</div><button type="button" class="btn-copy" onclick="copyTemplate('tmpl-none', this)">コピーする</button></div>`;
-  }
-  container.innerHTML = html;
-
-  resultArea.scrollIntoView({ behavior: 'smooth' });
-}
-
-function buildTemplateSection(label, questions, key) {
-  if (!questions.length) return '';
-  const id = 'tmpl-' + key;
-  const text = `【${label}についてご質問です】\nお世話になっております。ご提示いただいたお見積りについて、検討にあたり以下の点を確認させてください。\n\n${questions.join('\n')}\n\nお忙しいところ恐れ入りますが、ご回答のほどよろしくお願いいたします。`;
-  return `<div class="template-section"><h4>■ ${label}</h4><div class="template-box" id="${id}">${text}</div><button type="button" class="btn-copy" onclick="copyTemplate('${id}', this)">コピーする</button></div>`;
-}
-
-function copyTemplate(id, btn) {
-  const text = document.getElementById(id).innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    const original = btn.innerText;
-    btn.innerText = 'コピーしました！';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.innerText = original; btn.classList.remove('copied'); }, 1800);
-  }).catch(() => { alert('コピーに失敗しました。テキストを長押しして手動でコピーしてください。'); });
-}
-
-function checkLibraries() {
-  const box = document.getElementById('lib-status');
-  const pdfOk = typeof pdfjsLib !== 'undefined';
-  const ocrOk = typeof Tesseract !== 'undefined';
-
-  if (pdfOk && ocrOk) {
-    box.className = 'ok';
-    box.innerText = '✅ 見積書の自動読み取りの準備ができています。写真やPDFをアップロードできます。';
-    setTimeout(() => { box.style.display = 'none'; }, 4000);
-  } else {
-    box.className = 'fail';
-    let missing = [];
-    if (!pdfOk) missing.push('PDF読み取り');
-    if (!ocrOk) missing.push('写真の文字読み取り(AI-OCR)');
-    box.innerHTML = `⚠️ ${missing.join('・')}の部品をインターネットから取得できませんでした。<br>自動読み取りはご利用いただけませんが、下の「文字を貼り付ける」欄への直接入力や、フォームへの手入力は問題なくご利用いただけます。<br><span style="font-size:11px;">(考えられる原因：インターネットに繋がっていない／会社や学校のネットワークでセキュリティソフトが外部サイトの読み込みをブロックしている、など。Wi-Fiやモバイル回線を変えて試すと直ることがあります)</span>`;
-  }
-}
-
-/* ==================== 初期化 ==================== */
-document.getElementById('chk-wall').checked = true;
-document.getElementById('chk-rooftop').checked = true;
-onScopeChange();
-onAreaChange();
-checkLibraries();
-</script>
+<script src="assets/app.js"></script>
 </body>
 </html>
