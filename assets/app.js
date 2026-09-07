@@ -204,7 +204,7 @@ async function renderPdfThumbnail(file) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale: 0.3 });
+  const viewport = page.getViewport({ scale: 1.2 });
   const canvas = document.createElement('canvas');
   canvas.width = viewport.width;
   canvas.height = viewport.height;
@@ -692,7 +692,7 @@ function renderResultFileInfo() {
   }
   const name = document.getElementById('selected-file-name').textContent;
   const thumb = document.getElementById('selected-file-thumb');
-  const thumbHtml = thumb.classList.contains('show') ? `<img class="show" src="${thumb.src}" alt="">` : '';
+  const thumbHtml = thumb.classList.contains('show') ? `<img class="show" src="${thumb.src}" alt="" onclick="openImagePreview(this.src)">` : '';
   box.innerHTML = `${thumbHtml}<span class="name">📎 読み込んだ見積書：${name}</span>`;
   box.classList.add('show');
 }
@@ -787,6 +787,14 @@ function showHistoryDetail(id) {
 }
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
+}
+
+/* ==================== 画像プレビュー（タップで拡大表示） ==================== */
+function openImagePreview(src) {
+  if (!src) return;
+  document.getElementById('modal-body').innerHTML =
+    `<img class="preview-image-full" src="${src}" alt="見積書のプレビュー">`;
+  document.getElementById('modal-overlay').classList.add('show');
 }
 
 /* ==================== 専門家への相談送信（Google スプレッドシート連携） ====================
