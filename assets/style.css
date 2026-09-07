@@ -75,6 +75,7 @@ main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 .selected-file-info img.show { display:block; }
 .selected-file-info .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .selected-file-info .clear-btn { background:none; border:none; color:var(--sub); font-size:15px; cursor:pointer; padding:4px 6px; line-height:1; flex:0 0 auto; }
+.result-file-info { margin: 0 0 14px; background:#f8fafc; }
 
 #scan-status { text-align: center; font-size: 13px; color: var(--blue-dark); margin-top: 10px; display: none; }
 #lib-status { display:none; font-size:12px; padding:8px 12px; border-radius:8px; margin-bottom:10px; }
