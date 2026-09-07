@@ -653,8 +653,24 @@ function calculateDiagnostic(e) {
   };
   saveHistoryRecord(lastDiagnosis);
   setupLeadCard(lastDiagnosis);
+  renderResultFileInfo();
 
   resultArea.scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderResultFileInfo() {
+  const box = document.getElementById('result-file-info');
+  const info = document.getElementById('selected-file-info');
+  if (!info.classList.contains('show')) {
+    box.classList.remove('show');
+    box.innerHTML = '';
+    return;
+  }
+  const name = document.getElementById('selected-file-name').textContent;
+  const thumb = document.getElementById('selected-file-thumb');
+  const thumbHtml = thumb.classList.contains('show') ? `<img class="show" src="${thumb.src}" alt="">` : '';
+  box.innerHTML = `${thumbHtml}<span class="name">📎 読み込んだ見積書：${name}</span>`;
+  box.classList.add('show');
 }
 
 function buildTemplateSection(label, questions, key) {
