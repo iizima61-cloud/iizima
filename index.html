@@ -40,7 +40,7 @@
           <input type="file" id="file-input" accept="image/*,application/pdf">
         </div>
         <div id="selected-file-info" class="selected-file-info">
-          <img id="selected-file-thumb" alt="">
+          <img id="selected-file-thumb" alt="" onclick="openImagePreview(this.src)">
           <span class="name" id="selected-file-name"></span>
           <button type="button" class="clear-btn" id="selected-file-clear" aria-label="選択を解除">✕</button>
         </div>
