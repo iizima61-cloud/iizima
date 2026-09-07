@@ -168,7 +168,7 @@ function initUpload() {
 }
 
 let selectedFileThumbUrl = null;
-function showSelectedFile(file) {
+async function showSelectedFile(file) {
   const info = document.getElementById('selected-file-info');
   const nameEl = document.getElementById('selected-file-name');
   const thumbEl = document.getElementById('selected-file-thumb');
@@ -177,15 +177,39 @@ function showSelectedFile(file) {
   info.classList.add('show');
 
   if (selectedFileThumbUrl) { URL.revokeObjectURL(selectedFileThumbUrl); selectedFileThumbUrl = null; }
+  thumbEl.classList.remove('show');
+  thumbEl.removeAttribute('src');
 
   if (file.type.startsWith('image/')) {
     selectedFileThumbUrl = URL.createObjectURL(file);
     thumbEl.src = selectedFileThumbUrl;
     thumbEl.classList.add('show');
-  } else {
-    thumbEl.classList.remove('show');
-    thumbEl.removeAttribute('src');
+  } else if (file.type === 'application/pdf') {
+    try {
+      const dataUrl = await renderPdfThumbnail(file);
+      if (dataUrl && document.getElementById('selected-file-name').textContent === file.name) {
+        thumbEl.src = dataUrl;
+        thumbEl.classList.add('show');
+        renderResultFileInfo();
+      }
+    } catch (err) {
+      console.warn('PDFのプレビュー画像を作成できませんでした。', err);
+    }
   }
+}
+
+async function renderPdfThumbnail(file) {
+  if (typeof pdfjsLib === 'undefined') return null;
+  const buf = await file.arrayBuffer();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 0.3 });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return canvas.toDataURL('image/png');
 }
 function clearSelectedFile() {
   document.getElementById('selected-file-info').classList.remove('show');
