@@ -789,12 +789,29 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
 }
 
-/* ==================== 画像プレビュー（タップで拡大表示） ==================== */
+/* ==================== 画像プレビュー（タップで拡大表示・ホイールでズーム） ==================== */
 function openImagePreview(src) {
   if (!src) return;
-  document.getElementById('modal-body').innerHTML =
-    `<img class="preview-image-full" src="${src}" alt="見積書のプレビュー">`;
+  const body = document.getElementById('modal-body');
+  body.innerHTML = `
+    <div class="preview-image-wrap" id="preview-image-wrap">
+      <img class="preview-image-full" id="preview-image-el" src="${src}" alt="見積書のプレビュー">
+    </div>
+    <p class="preview-hint">マウスホイールで拡大・縮小、画像をなぞってスクロールできます（ダブルクリックでもズーム）</p>
+  `;
   document.getElementById('modal-overlay').classList.add('show');
+
+  const wrap = document.getElementById('preview-image-wrap');
+  const img = document.getElementById('preview-image-el');
+  let zoom = 1;
+  const applyZoom = z => { zoom = Math.min(4, Math.max(1, z)); img.style.transform = `scale(${zoom})`; };
+
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    applyZoom(zoom - e.deltaY * 0.0015);
+  }, { passive: false });
+
+  img.addEventListener('dblclick', () => applyZoom(zoom > 1 ? 1 : 2));
 }
 
 /* ==================== 専門家への相談送信（Google スプレッドシート連携） ====================

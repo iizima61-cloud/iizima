@@ -72,7 +72,9 @@ main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 .selected-file-info { display:none; align-items:center; gap:10px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:9px 12px; margin-top:10px; font-size:13px; color:#2d3748; }
 .selected-file-info.show { display:flex; }
 .selected-file-info img { width:38px; height:38px; object-fit:cover; border-radius:6px; border:1px solid var(--border); display:none; flex:0 0 auto; cursor:pointer; }
-.preview-image-full { width:100%; height:auto; border-radius:8px; display:block; }
+.preview-image-wrap { overflow:auto; max-height:68vh; border-radius:8px; background:#000; touch-action:pan-x pan-y; }
+.preview-image-full { width:100%; height:auto; display:block; transform-origin:0 0; }
+.preview-hint { text-align:center; font-size:11px; color:var(--sub); margin:8px 0 0; }
 .selected-file-info img.show { display:block; }
 .selected-file-info .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .selected-file-info .clear-btn { background:none; border:none; color:var(--sub); font-size:15px; cursor:pointer; padding:4px 6px; line-height:1; flex:0 0 auto; }
