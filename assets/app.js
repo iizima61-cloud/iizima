@@ -157,9 +157,40 @@ function initUpload() {
   });
   fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
 
+  document.getElementById('selected-file-clear').addEventListener('click', e => {
+    e.stopPropagation();
+    clearSelectedFile();
+  });
+
   if (window['pdfjsLib']) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
+}
+
+let selectedFileThumbUrl = null;
+function showSelectedFile(file) {
+  const info = document.getElementById('selected-file-info');
+  const nameEl = document.getElementById('selected-file-name');
+  const thumbEl = document.getElementById('selected-file-thumb');
+
+  nameEl.textContent = file.name;
+  info.classList.add('show');
+
+  if (selectedFileThumbUrl) { URL.revokeObjectURL(selectedFileThumbUrl); selectedFileThumbUrl = null; }
+
+  if (file.type.startsWith('image/')) {
+    selectedFileThumbUrl = URL.createObjectURL(file);
+    thumbEl.src = selectedFileThumbUrl;
+    thumbEl.classList.add('show');
+  } else {
+    thumbEl.classList.remove('show');
+    thumbEl.removeAttribute('src');
+  }
+}
+function clearSelectedFile() {
+  document.getElementById('selected-file-info').classList.remove('show');
+  document.getElementById('file-input').value = '';
+  if (selectedFileThumbUrl) { URL.revokeObjectURL(selectedFileThumbUrl); selectedFileThumbUrl = null; }
 }
 
 function setScanStatus(text, percent) {
@@ -176,6 +207,8 @@ function setScanStatus(text, percent) {
 }
 
 async function handleFile(file) {
+  showSelectedFile(file);
+
   const isPdf = file.type === 'application/pdf';
   const isImage = file.type.startsWith('image/');
 
