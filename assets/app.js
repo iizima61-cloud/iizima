@@ -10,7 +10,7 @@
    空欄のままなら「専門家に相談する」機能は表示されません。
 ==================================================================== */
 const CONFIG = {
-  sheetsWebhookUrl: ''
+  sheetsWebhookUrl: 'https://script.google.com/macros/s/AKfycbw2TMFIKNnAE63OOmGeiQCglwSUH8yLt-NwkqeNc6JO_bl4x1FEgqOh4pbwSyCFSW2xzg/exec'
 };
 
 const SQM_PER_TSUBO = 3.30578;
