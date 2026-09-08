@@ -34,7 +34,7 @@ const WATERPROOF_RATE = {
 
 const MANUFACTURER_KEYWORDS = [
   "日本ペイント","関西ペイント","エスケー化研","SK化研","アステックペイント","アステック",
-  "プレマテックス","日進産業","ガイナ","大日本塗料","水谷ペイント","菊水化学","アトミクス",
+  "プレマテックス","日進産業","ガイナ","大日本塗料","水谷ペイント","水谷","菊水化学工業","菊水化学","キクスイ","アトミクス",
   "エーゲンダイヤ","トウペ","中国塗料","ロックペイント","四国化成"
 ];
 const PAINT_PRODUCT_KEYWORDS = [
@@ -446,13 +446,17 @@ function analyzeText(text) {
   };
 
   // ---- 総額の抽出 ----
-  let priceMatch = text.match(/(?:御見積合計|見積合計|合計金額|ご請求金額|総額|税込)[^0-9]{0,10}([0-9][0-9,]{4,})\s*円/);
+  // 「円」表記だけでなく「¥」記号や、「お見積金額」「合計」など見出しの直後に
+  // 金額だけが書かれているケース（円もなし）にも対応する。
+  let priceMatch = text.match(/(?:お見積金額|御見積金額|見積金額|御見積合計|見積合計|合計金額|ご請求金額|総額|合計|税込)[^0-9]{0,10}([0-9][0-9,]{4,})/);
   if (!priceMatch) priceMatch = text.match(/([0-9][0-9,]{4,})\s*円\s*(?:（?税込）?)/);
   if (priceMatch) {
     result.totalPriceMan = Math.round(parseInt(priceMatch[1].replace(/,/g, ''), 10) / 1000) / 10;
   } else {
-    // フェールセーフ：文中で最も大きい「円」付き金額（10万円以上）を採用
-    const all = [...text.matchAll(/([0-9][0-9,]{4,})\s*円/g)].map(m => parseInt(m[1].replace(/,/g, ''), 10)).filter(n => n >= 100000);
+    // フェールセーフ：文中で最も大きい「円」または「¥」付きの金額（10万円以上）を採用
+    const yenSuffixed = [...text.matchAll(/([0-9][0-9,]{4,})\s*円/g)].map(m => parseInt(m[1].replace(/,/g, ''), 10));
+    const yenPrefixed = [...text.matchAll(/[¥￥]\s*([0-9][0-9,]{4,})/g)].map(m => parseInt(m[1].replace(/,/g, ''), 10));
+    const all = [...yenSuffixed, ...yenPrefixed].filter(n => n >= 100000);
     if (all.length) result.totalPriceMan = Math.round(Math.max(...all) / 1000) / 10;
   }
 
@@ -483,10 +487,20 @@ function analyzeText(text) {
   }
 
   // ---- メーカー・商品名 ----
-  for (const m of MANUFACTURER_KEYWORDS) { if (text.includes(m)) { result.manufacturer = m; result.foundKeywords.push(m); break; } }
-  if (!result.manufacturer) {
-    for (const p of PAINT_PRODUCT_KEYWORDS) { if (text.includes(p)) { result.manufacturer = p; result.foundKeywords.push(p); break; } }
+  // 壁と屋根で違うメーカーの塗料を使うケースもあるため、見つかった分はすべて拾う
+  // （「水谷ペイント」と「水谷」のような、同じメーカーの略記の重複はまとめる）
+  const foundManufacturers = [];
+  for (const m of MANUFACTURER_KEYWORDS) {
+    if (!text.includes(m)) continue;
+    if (foundManufacturers.some(existing => existing.includes(m) || m.includes(existing))) continue;
+    foundManufacturers.push(m);
   }
+  if (!foundManufacturers.length) {
+    for (const p of PAINT_PRODUCT_KEYWORDS) { if (text.includes(p)) { foundManufacturers.push(p); break; } }
+  }
+  result.manufacturers = foundManufacturers;
+  result.manufacturer = foundManufacturers[0] || null;
+  result.foundKeywords = foundManufacturers;
 
   // ---- 一式の出現回数 ----
   result.isshikiCount = (text.match(/一式/g) || []).length;
@@ -557,9 +571,9 @@ function applyExtractedData(d) {
     document.getElementById('grade-auto').style.display = 'none';
   }
 
-  if (d.manufacturer) {
+  if (d.manufacturers && d.manufacturers.length) {
     document.getElementById('chk-no-paint-name').checked = false;
-    reportLines.push(`🏭 塗料メーカー・商品名として <b>「${d.manufacturer}」</b> の記載を確認しました。メーカー名がはっきりしているのは良い傾向です。`);
+    reportLines.push(`🏭 塗料メーカー・商品名として <b>「${d.manufacturers.join('」「')}」</b> の記載を確認しました。メーカー名がはっきりしているのは良い傾向です。`);
   } else {
     reportLines.push(`🏭 塗料のメーカー名・正式な商品名は見つかりませんでした。「◯◯シリコン塗料」のような曖昧な表記のみの可能性があります。`);
   }
