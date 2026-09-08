@@ -56,6 +56,8 @@ const ROOF_KEYWORDS = ["屋根塗装","屋根"];
 const BALCONY_KEYWORDS = ["バルコニー防水","ベランダ防水","バルコニー","ベランダ"];
 const ROOFTOP_KEYWORDS = ["屋上防水","屋上"];
 const WATERPROOF_METHOD_KEYWORDS = ["ウレタン防水","FRP防水","塩ビシート","シート防水","通気緩衝","トップコート"];
+const SCAFFOLD_KEYWORDS = ["足場"];
+const WARRANTY_KEYWORDS = ["保証書","保証期間","瑕疵保証","アフター保証"];
 
 /* ==================== タブ切り替え ==================== */
 function initTabs() {
@@ -326,6 +328,50 @@ async function extractTextFromImage(file) {
   return await ocrFile(file);
 }
 
+// 文字認識の精度を上げるため、グレースケール化＋コントラスト強調を行う。
+// スマホ写真は照明のムラや低コントラストで誤読しやすいため、白黒をはっきりさせる。
+function enhanceCanvasForOcr(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const contrast = 1.35;
+  const intercept = 128 * (1 - contrast);
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    let v = gray * contrast + intercept;
+    v = v < 0 ? 0 : v > 255 ? 255 : v;
+    data[i] = data[i + 1] = data[i + 2] = v;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+// 解像度が低い写真は拡大してから認識にかけると精度が上がりやすい。
+async function prepareImageForOcr(file) {
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = url;
+    });
+    URL.revokeObjectURL(url);
+
+    const minWidth = 1600;
+    const scale = img.width < minWidth ? minWidth / img.width : 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    enhanceCanvasForOcr(canvas);
+    return canvas.toDataURL('image/png');
+  } catch (err) {
+    console.warn('画像の前処理に失敗したため、元の画像でOCRを実行します。', err);
+    return file;
+  }
+}
+
 async function ocrFile(file) {
   const workerPath = await getTesseractWorkerPath();
   const options = {
@@ -336,7 +382,8 @@ async function ocrFile(file) {
     }
   };
   if (workerPath) options.workerPath = workerPath;
-  const { data } = await Tesseract.recognize(file, 'jpn+eng', options);
+  const source = await prepareImageForOcr(file);
+  const { data } = await Tesseract.recognize(source, 'jpn+eng', options);
   return data.text;
 }
 async function ocrCanvas(canvas) {
@@ -349,6 +396,7 @@ async function ocrCanvas(canvas) {
     }
   };
   if (workerPath) options.workerPath = workerPath;
+  enhanceCanvasForOcr(canvas);
   const { data } = await Tesseract.recognize(canvas.toDataURL('image/png'), 'jpn+eng', options);
   return data.text;
 }
@@ -371,12 +419,30 @@ function normalizeText(text) {
   return text;
 }
 
+// 指定キーワードの直後付近（40文字以内）にある「◯◯m2」を探す。
+// 「外壁 120m2」「屋根塗装：60.5m2」のように、工事項目ごとに書かれた面積を拾うために使う。
+function extractAreaNear(text, keywords) {
+  for (const kw of keywords) {
+    let searchFrom = 0;
+    while (true) {
+      const idx = text.indexOf(kw, searchFrom);
+      if (idx === -1) break;
+      const window = text.slice(idx, idx + 40);
+      const m = window.match(/([0-9]+(?:\.[0-9]+)?)\s*m2/);
+      if (m) return parseFloat(m[1]);
+      searchFrom = idx + kw.length;
+    }
+  }
+  return null;
+}
+
 function analyzeText(text) {
   const result = {
     totalPriceMan: null, areaSqm: null, grade: null, manufacturer: null,
     isshikiCount: 0, hasRepairKeywords: false, hasDrainKeyword: false,
     hasWall: false, hasRoof: false, hasBalcony: false, hasRooftop: false,
-    hasWaterproofMethod: false, foundKeywords: []
+    hasWaterproofMethod: false, hasScaffold: false, hasWarranty: false,
+    discountMan: null, foundKeywords: []
   };
 
   // ---- 総額の抽出 ----
@@ -390,7 +456,18 @@ function analyzeText(text) {
     if (all.length) result.totalPriceMan = Math.round(Math.max(...all) / 1000) / 10;
   }
 
-  // ---- 面積の抽出（㎡優先、なければ坪から換算）----
+  // ---- 値引き額の抽出 ----
+  const discountMatch = text.match(/(?:値引き|値引|割引)[^0-9]{0,10}([0-9][0-9,]{2,})\s*円/);
+  if (discountMatch) {
+    result.discountMan = Math.round(parseInt(discountMatch[1].replace(/,/g, ''), 10) / 1000) / 10;
+  }
+
+  // ---- 面積の抽出（工事項目ごと。見つからない場合は書類全体から1つだけ拾う）----
+  result.areaWall = extractAreaNear(text, WALL_KEYWORDS);
+  result.areaRoof = extractAreaNear(text, ROOF_KEYWORDS);
+  result.areaBalcony = extractAreaNear(text, BALCONY_KEYWORDS);
+  result.areaRooftop = extractAreaNear(text, ROOFTOP_KEYWORDS);
+
   let areaMatch = text.match(/(?:施工面積|延床面積|塗装面積|面積)[^0-9]{0,6}([0-9]+(?:\.[0-9]+)?)\s*m2/);
   if (!areaMatch) areaMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*m2/);
   if (areaMatch) {
@@ -420,6 +497,10 @@ function analyzeText(text) {
   result.hasDrainKeyword = DRAIN_KEYWORDS.some(k => text.includes(k));
   // ---- 防水工法 ----
   result.hasWaterproofMethod = WATERPROOF_METHOD_KEYWORDS.some(k => text.includes(k));
+  // ---- 足場 ----
+  result.hasScaffold = SCAFFOLD_KEYWORDS.some(k => text.includes(k));
+  // ---- 保証 ----
+  result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
 
   // ---- 工事範囲の推定 ----
   result.hasWall = WALL_KEYWORDS.some(k => text.includes(k));
@@ -440,20 +521,32 @@ function applyExtractedData(d) {
     reportLines.push(`💰 総額をうまく読み取れませんでした。お手数ですが「見積もり提示総額」欄に手入力をお願いします。`);
   }
 
-  if (d.areaSqm) {
+  const areaLines = [];
+  if (d.areaWall) areaLines.push(`外壁 約${d.areaWall}㎡`);
+  if (d.areaRoof) areaLines.push(`屋根 約${d.areaRoof}㎡`);
+  if (d.areaBalcony) areaLines.push(`バルコニー 約${d.areaBalcony}㎡`);
+  if (d.areaRooftop) areaLines.push(`屋上 約${d.areaRooftop}㎡`);
+  if (areaLines.length) {
+    reportLines.push(`📐 施工面積として ${areaLines.join('、')} を読み取りました。`);
+  } else if (d.areaSqm) {
     reportLines.push(`📐 施工面積として <b>約${d.areaSqm}㎡</b> を読み取りました。該当する工事範囲の面積欄に反映しています。`);
   }
 
-  if (d.hasWall) { document.getElementById('chk-wall').checked = true; if (d.areaSqm) document.getElementById('area-wall').value = d.areaSqm; }
-  if (d.hasRoof) { document.getElementById('chk-roof').checked = true; if (d.areaSqm && !d.hasWall) document.getElementById('area-roof').value = d.areaSqm; }
-  if (d.hasBalcony) { document.getElementById('chk-balcony').checked = true; if (d.areaSqm && !d.hasWall && !d.hasRoof) document.getElementById('area-balcony').value = d.areaSqm; }
-  if (d.hasRooftop) { document.getElementById('chk-rooftop').checked = true; if (d.areaSqm && !d.hasWall && !d.hasRoof && !d.hasBalcony) document.getElementById('area-rooftop').value = d.areaSqm; }
+  if (d.hasWall) { document.getElementById('chk-wall').checked = true; if (d.areaWall) document.getElementById('area-wall').value = d.areaWall; else if (d.areaSqm) document.getElementById('area-wall').value = d.areaSqm; }
+  if (d.hasRoof) { document.getElementById('chk-roof').checked = true; if (d.areaRoof) document.getElementById('area-roof').value = d.areaRoof; else if (d.areaSqm && !d.hasWall) document.getElementById('area-roof').value = d.areaSqm; }
+  if (d.hasBalcony) { document.getElementById('chk-balcony').checked = true; if (d.areaBalcony) document.getElementById('area-balcony').value = d.areaBalcony; else if (d.areaSqm && !d.hasWall && !d.hasRoof) document.getElementById('area-balcony').value = d.areaSqm; }
+  if (d.hasRooftop) { document.getElementById('chk-rooftop').checked = true; if (d.areaRooftop) document.getElementById('area-rooftop').value = d.areaRooftop; else if (d.areaSqm && !d.hasWall && !d.hasRoof && !d.hasBalcony) document.getElementById('area-rooftop').value = d.areaSqm; }
   if (!d.hasWall && !d.hasRoof && !d.hasBalcony && !d.hasRooftop) {
     // 何も検出できなければ、初期値の外壁塗装のみ有効化しておく
     document.getElementById('chk-wall').checked = true;
   }
   onScopeChange();
   onAreaChange();
+
+  if (d.discountMan) {
+    document.getElementById('discount-amount').value = d.discountMan;
+    reportLines.push(`💸 値引きとして <b>約${d.discountMan}万円</b> の記載を見つけました。値引き額欄に反映しています。`);
+  }
 
   if (d.grade) {
     document.getElementById('paint-grade').value = d.grade;
@@ -485,6 +578,16 @@ function applyExtractedData(d) {
   if (waterActiveNow) {
     document.getElementById('chk-no-drain').checked = !d.hasDrainKeyword;
     if (d.hasDrainKeyword) reportLines.push(`🚿 防水工事に必要な「改修ドレン」についての記載を確認できました。`);
+  }
+
+  if (d.hasScaffold) {
+    reportLines.push(`🪜 「足場」に関する記載を確認できました。`);
+  } else {
+    reportLines.push(`🪜 「足場」についての記載が見当たりませんでした。外壁・屋根の工事では通常必須の費用のため、別途か含まれているか確認しましょう。`);
+  }
+
+  if (d.hasWarranty) {
+    reportLines.push(`📜 保証についての記載を確認できました。保証期間・保証範囲を契約前に確認しておくと安心です。`);
   }
 
   const reportBox = document.getElementById('ai-report');
