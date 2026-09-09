@@ -26,11 +26,10 @@ body {
   color: #fff; padding: 14px 16px calc(14px + 2px);
   text-align: center;
 }
-.topbar h1 { font-size: 16px; margin: 0 0 2px; font-weight: bold; }
+.topbar .eyebrow { font-size: 10px; margin: 0 0 4px; opacity: .85; letter-spacing: .02em; }
+.topbar h1 { font-size: 18px; margin: 0 0 4px; font-weight: bold; }
 .topbar p { font-size: 11px; margin: 0; opacity: .9; }
-.topbar-pitch { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.25); }
-.topbar-pitch h2 { font-size: 14px; margin: 0 0 4px; font-weight: bold; }
-.topbar-pitch p { font-size: 11px; margin: 0; opacity: .95; }
+.topbar .topbar-company { margin-top: 8px; opacity: .8; }
 
 main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 
@@ -60,6 +59,11 @@ main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 .step-chip { flex:1 1 90px; background:#fff; border:1px solid #bee3f8; border-radius:8px; padding:8px 6px; font-size:11px; color:#2c5282; text-align:center; display:flex; flex-direction:column; align-items:center; gap:4px; }
 
 .hero-cta-btn { margin-bottom:14px; font-size:15px; }
+
+.trust-strip { background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:12px; color:var(--sub); text-align:center; margin-bottom:14px; }
+
+.detail-link-row { text-align:center; margin:-4px 0 14px; }
+.detail-anchor-link { display:inline-block; font-size:12.5px; color:var(--blue-dark); text-decoration:underline; cursor:pointer; }
 
 .ai-summary-card { background:#fff; border:1px solid #bee3f8; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
 .ai-summary-card h3 { font-size:13px; margin:0 0 8px; color:var(--blue-dark); }

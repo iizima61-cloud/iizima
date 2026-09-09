@@ -20,12 +20,10 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <h1>外壁塗装・防水工事 見積もり適正診断</h1>
-    <p>むずかしい専門知識がなくても、見積書が適正かその場でチェック</p>
-    <div class="topbar-pitch">
-      <h2>その見積もり、本当に大丈夫？</h2>
-      <p>外壁塗装・屋根塗装・防水工事の見積書を、専門知識がなくても簡単にチェックできます。</p>
-    </div>
+    <p class="eyebrow">外壁塗装・防水工事 見積もり適正診断アプリ</p>
+    <h1>その見積もり、本当に大丈夫？</h1>
+    <p>専門知識がなくても、見積書が適正かその場でチェックできます。</p>
+    <p class="topbar-company">飯島防水株式会社が無料で提供する見積もりチェックツールです</p>
   </div>
 
   <main>
@@ -224,7 +222,51 @@
           この診断は、入力された見積書の内容や一般的な価格情報などをもとにした簡易チェックです。実際の工事価格は、建物の状態、施工条件、地域、材料、施工範囲などによって変わります。最終的な判断には現地調査や複数社の見積もりをご活用ください。
         </div>
 
+        <div class="trust-strip">
+          🏢 この診断は「飯島防水株式会社」（長野市・防水/塗装専門店）が無料で提供しています
+        </div>
+
         <div id="result-file-info" class="selected-file-info result-file-info"></div>
+
+        <div class="card" id="lead-card">
+          <h2>📨 専門家に相談する（任意）</h2>
+          <div class="hint">この診断結果をもとに、担当者から詳しいご説明やお見積りのご相談を受けたい方はこちらからご連絡ください。</div>
+          <form id="lead-form">
+            <div class="form-group">
+              <label>お名前</label>
+              <input type="text" id="lead-name" placeholder="山田 太郎">
+            </div>
+            <div class="form-group">
+              <label>電話番号 または メールアドレス</label>
+              <input type="text" id="lead-contact" placeholder="090-1234-5678 / example@mail.com">
+            </div>
+            <div class="form-group">
+              <label>ご相談内容（複数選択可・任意）</label>
+              <div class="lead-topics">
+                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="見積書を確認してほしい"> 見積書を確認してほしい</label>
+                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="複数の見積もりを比較してほしい"> 複数の見積もりを比較してほしい</label>
+                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="塗料について相談したい"> 塗料について相談したい</label>
+                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="防水工事について相談したい"> 防水工事について相談したい</label>
+                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="現地調査を依頼したい"> 現地調査を依頼したい</label>
+                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="その他"> その他</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>ご質問・ご要望（任意）</label>
+              <input type="text" id="lead-memo" placeholder="現地調査の希望日など">
+            </div>
+            <label class="consent-row">
+              <input type="checkbox" id="lead-consent">
+              <span>入力内容と診断結果を送信し、担当者からの連絡を受け取ることに同意します。</span>
+            </label>
+            <button type="submit" class="btn-primary">この内容で相談する</button>
+            <div class="lead-status" id="lead-status"></div>
+          </form>
+        </div>
+
+        <div class="detail-link-row">
+          <a href="#subscore-card" class="detail-anchor-link" onclick="event.preventDefault(); document.getElementById('subscore-card').scrollIntoView({behavior:'smooth', block:'start'});">▼ 詳しい分析結果（5項目評価・価格判定など）を見る</a>
+        </div>
 
         <div class="card" id="share-card" style="text-align:center;">
           <button type="button" class="btn-copy" id="share-result-btn" style="width:100%;" onclick="shareResult()">🔗 この診断結果をURLで共有する</button>
@@ -267,42 +309,6 @@
              style="display:inline-block; color:#2b6cb0; font-weight:bold; text-decoration:none; font-size:14px; line-height:1.6;">
             🏠 飯島防水について詳しく見る（施工実績・会社情報）
           </a>
-        </div>
-
-        <div class="card" id="lead-card">
-          <h2>📨 専門家に相談する（任意）</h2>
-          <div class="hint">この診断結果をもとに、担当者から詳しいご説明やお見積りのご相談を受けたい方はこちらからご連絡ください。</div>
-          <form id="lead-form">
-            <div class="form-group">
-              <label>お名前</label>
-              <input type="text" id="lead-name" placeholder="山田 太郎">
-            </div>
-            <div class="form-group">
-              <label>電話番号 または メールアドレス</label>
-              <input type="text" id="lead-contact" placeholder="090-1234-5678 / example@mail.com">
-            </div>
-            <div class="form-group">
-              <label>ご相談内容（複数選択可・任意）</label>
-              <div class="lead-topics">
-                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="見積書を確認してほしい"> 見積書を確認してほしい</label>
-                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="複数の見積もりを比較してほしい"> 複数の見積もりを比較してほしい</label>
-                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="塗料について相談したい"> 塗料について相談したい</label>
-                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="防水工事について相談したい"> 防水工事について相談したい</label>
-                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="現地調査を依頼したい"> 現地調査を依頼したい</label>
-                <label class="check-item lead-topic-item"><input type="checkbox" class="lead-topic" value="その他"> その他</label>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>ご質問・ご要望（任意）</label>
-              <input type="text" id="lead-memo" placeholder="現地調査の希望日など">
-            </div>
-            <label class="consent-row">
-              <input type="checkbox" id="lead-consent">
-              <span>入力内容と診断結果を送信し、担当者からの連絡を受け取ることに同意します。</span>
-            </label>
-            <button type="submit" class="btn-primary">この内容で相談する</button>
-            <div class="lead-status" id="lead-status"></div>
-          </form>
         </div>
 
         <div class="card">
