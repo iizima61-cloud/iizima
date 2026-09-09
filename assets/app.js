@@ -155,6 +155,8 @@ function loadSample(type) {
   onScopeChange();
   onAreaChange();
   document.getElementById('ai-report').style.display = 'none';
+  document.getElementById('paint-manufacturer').value = '';
+  document.getElementById('paint-product').value = '';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -423,6 +425,13 @@ async function ocrCanvas(canvas, statusIds) {
   return data.text;
 }
 
+// フェーズ4: AI読み取り結果の確認カードのボタン、および画面上部のCTAボタンから
+// 「② 工事の内容と面積」のフォームまでスムーズスクロールするために使う。
+function scrollToDiagForm() {
+  const target = document.getElementById('diag-form') || document.getElementById('drop-zone');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function analyzePastedText() {
   const raw = document.getElementById('paste-text').value;
   if (!raw.trim()) { alert('文章を貼り付けてください。'); return; }
@@ -529,6 +538,10 @@ function analyzeText(text) {
   result.manufacturer = foundManufacturers[0] || null;
   result.foundKeywords = foundManufacturers;
 
+  // ---- フェーズ4: メーカー名・商品名をそれぞれ別の入力欄に反映するため、個別にも保持する ----
+  result.manufacturerOnly = MANUFACTURER_KEYWORDS.find(m => text.includes(m)) || null;
+  result.productOnly = PAINT_PRODUCT_KEYWORDS.find(p => text.includes(p)) || null;
+
   // ---- 一式の出現回数 ----
   result.isshikiCount = (text.match(/一式/g) || []).length;
 
@@ -542,6 +555,11 @@ function analyzeText(text) {
   result.hasScaffold = SCAFFOLD_KEYWORDS.some(k => text.includes(k));
   // ---- 保証 ----
   result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
+  result.warrantyYears = null;
+  if (result.hasWarranty) {
+    const warrantyMatch = text.match(/([0-9]+)\s*年[^0-9]{0,6}保証|保証[^0-9]{0,6}([0-9]+)\s*年/);
+    if (warrantyMatch) result.warrantyYears = warrantyMatch[1] || warrantyMatch[2];
+  }
 
   // ---- 工事範囲の推定 ----
   result.hasWall = WALL_KEYWORDS.some(k => text.includes(k));
@@ -660,6 +678,10 @@ function applyExtractedData(d) {
     reportLines.push(`🏭 塗料のメーカー名・正式な商品名は見つかりませんでした。「◯◯シリコン塗料」のような曖昧な表記のみの可能性があります。`);
   }
 
+  // ---- フェーズ4: メーカー・商品名の個別入力欄へ反映（読み取れない場合は空欄のままにする） ----
+  if (d.manufacturerOnly) document.getElementById('paint-manufacturer').value = d.manufacturerOnly;
+  if (d.productOnly) document.getElementById('paint-product').value = d.productOnly;
+
   document.getElementById('chk-isshiki').checked = d.isshikiCount >= 4;
   if (d.isshikiCount > 0) {
     reportLines.push(`📋 見積書の中に「一式」という言葉が <b>${d.isshikiCount}回</b> 見つかりました。${d.isshikiCount >= 4 ? 'やや多めなので、内訳の開示を求めることをおすすめします。' : 'この程度であれば大きな問題ではないことが多いです。'}`);
@@ -686,8 +708,39 @@ function applyExtractedData(d) {
     reportLines.push(`📜 保証についての記載を確認できました。保証期間・保証範囲を契約前に確認しておくと安心です。`);
   }
 
+  // ---- フェーズ4: AI読み取り結果の確認カード（工事種別・面積・メーカー・商品名・金額・保証を一覧表示） ----
+  const workTypeLabels = [];
+  if (d.hasWall) workTypeLabels.push('外壁塗装');
+  if (d.hasRoof) workTypeLabels.push('屋根塗装');
+  if (d.hasBalcony) workTypeLabels.push('バルコニー防水');
+  if (d.hasRooftop) workTypeLabels.push('屋上防水');
+
+  const areaSummaryParts = [];
+  if (d.areaWall) areaSummaryParts.push(`外壁 約${d.areaWall}㎡`);
+  if (d.areaRoof) areaSummaryParts.push(`屋根 約${d.areaRoof}㎡`);
+  if (d.areaBalcony) areaSummaryParts.push(`バルコニー 約${d.areaBalcony}㎡`);
+  if (d.areaRooftop) areaSummaryParts.push(`屋上 約${d.areaRooftop}㎡`);
+  if (!areaSummaryParts.length && d.areaSqm) areaSummaryParts.push(`約${d.areaSqm}㎡`);
+
+  const priceYenText = d.totalPriceMan ? `${Math.round(d.totalPriceMan * 10000).toLocaleString()}円` : '不明';
+  const warrantyText = d.warrantyYears ? `${d.warrantyYears}年` : (d.hasWarranty ? '記載あり（年数不明）' : '不明');
+
+  const summaryRows = [
+    ['工事種別', workTypeLabels.length ? workTypeLabels.join('・') : '不明'],
+    ['施工面積', areaSummaryParts.length ? areaSummaryParts.join('、') : '不明'],
+    ['塗料メーカー', d.manufacturerOnly || '不明'],
+    ['商品名', d.productOnly || '不明'],
+    ['見積金額', priceYenText],
+    ['保証', warrantyText]
+  ];
+  const summaryHtml = `
+    <div class="ai-summary-card">
+      <h3>🤖 AI読み取り結果</h3>
+      <ul class="ai-summary-list">${summaryRows.map(([label, value]) => `<li><span class="ai-summary-label">${label}</span><span class="ai-summary-value">${value}</span></li>`).join('')}</ul>
+    </div>`;
+
   const reportBox = document.getElementById('ai-report');
-  reportBox.innerHTML = `<h3>🤖 AI読み取りレポート</h3><ul>${reportLines.map(l => `<li>${l}</li>`).join('')}</ul><p style="margin:8px 0 0;color:#a0733a;font-size:11px;">※文字認識には誤読の可能性があります。診断前に必ず内容をご確認・修正ください。</p>`;
+  reportBox.innerHTML = `${summaryHtml}<h3>🤖 AI読み取りレポート</h3><ul>${reportLines.map(l => `<li>${l}</li>`).join('')}</ul><p style="margin:8px 0 0;color:#a0733a;font-size:11px;">※文字認識には誤読の可能性があります。診断前に必ず内容をご確認・修正ください。</p><button type="button" class="btn-primary ai-summary-confirm-btn" onclick="scrollToDiagForm()">内容を確認して診断へ</button>`;
   reportBox.style.display = 'block';
   reportBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -712,8 +765,10 @@ function getScoreMeaning(score) {
 }
 
 // 価格判定を5段階（🟢おおむね妥当 / 🟡やや高め / 🟡やや安め / 🔴安すぎる可能性 / ⚪判断材料不足）で返す。
+// 施工面積が未入力（expectedMinManが0）、または見積提示総額が未入力（price）の場合は、
+// 無理に🟢🟡🔴で判定せず「⚪ 判断材料不足」とする。
 function getPriceJudgement(price, expectedMinMan, expectedMaxMan) {
-  if (!(expectedMinMan > 0)) {
+  if (!(expectedMinMan > 0) || !(price > 0)) {
     return { icon: '⚪', label: '判断材料不足', tone: 'neutral' };
   }
   if (price < expectedMinMan * 0.75) return { icon: '🔴', label: '安すぎる可能性', tone: 'danger' };
@@ -984,7 +1039,7 @@ function calculateDiagnostic(e) {
 
   // ---- 価格診断 ----
   const priceJudgement = getPriceJudgement(price, expectedMinMan, expectedMaxMan);
-  if (expectedMinMan > 0) {
+  if (expectedMinMan > 0 && priceJudgement.tone !== 'neutral') {
     if (priceJudgement.tone === 'danger') {
       score -= 25;
       issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり安い金額です（手抜き・工程省略のリスク）', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それを大きく下回っています。下地処理や塗装の回数、必要な部材が省かれている可能性があります。` });
@@ -1116,6 +1171,10 @@ function calculateDiagnostic(e) {
     pricePointsHint.textContent = '高くなっている理由の候補：';
     pricePointsHint.style.display = 'block';
     pricePointsEl.innerHTML = linkifyGlossary(EXPENSIVE_REASON_POINTS.map(p => `<li>${p}</li>`).join(''));
+  } else if (priceJudgement.tone === 'neutral') {
+    pricePointsHint.textContent = '見積書に施工面積・材料・施工範囲などの情報が少ないため、価格の判断精度が低くなっています。';
+    pricePointsHint.style.display = 'block';
+    pricePointsEl.innerHTML = '';
   } else {
     pricePointsHint.style.display = 'none';
     pricePointsEl.innerHTML = '';
@@ -1699,6 +1758,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('history-clear-btn').addEventListener('click', clearHistory);
   document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') closeModal(); });
   document.getElementById('compare-run-btn').addEventListener('click', runCompare);
+  document.getElementById('cta-check-btn').addEventListener('click', () => {
+    document.getElementById('drop-zone').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
 
   // ---- フェーズ3: 共有リンク（?share=...）からの読み込み ----
   // 共有された内容がある場合はそちらを優先し、無ければ今まで通りの初期値（サンプル用チェック）を入れる。
