@@ -20,7 +20,7 @@ function doPost(e) {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
       '受信日時', 'お名前', '電話番号/メール', 'スコア', '判定',
-      '見積提示額(万円)', '適正相場(万円)', '工事内容', 'ご質問・ご要望'
+      '見積提示額(万円)', '適正相場(万円)', '工事内容', '相談内容', 'ご質問・ご要望'
     ]);
   }
 
@@ -35,6 +35,7 @@ function doPost(e) {
     data.priceMan || '',
     (data.expectedMin || '') + '〜' + (data.expectedMax || ''),
     data.scopeSummary || '',
+    (data.topics && data.topics.length) ? data.topics.join('、') : '',
     data.memo || ''
   ]);
 
@@ -53,6 +54,7 @@ function sendNotifyEmail(data) {
     'iizima見積もり診断アプリから、新しい相談の連絡が届きました。\n\n' +
     'お名前　　　：' + (data.name || '') + '\n' +
     '連絡先　　　：' + (data.contact || '') + '\n' +
+    '相談内容　　：' + ((data.topics && data.topics.length) ? data.topics.join('、') : '（なし）') + '\n' +
     'ご質問・要望：' + (data.memo || '（なし）') + '\n\n' +
     '診断スコア　：' + (data.score || '') + '点\n' +
     '工事内容　　：' + (data.scopeSummary || '') + '\n' +

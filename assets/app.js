@@ -797,17 +797,83 @@ function buildReasonList(ctx) {
   return lines;
 }
 
-// issues（検出されたポイント）の中から優先度の高いものを最大3つ選ぶ。
-function buildChecklist(issuesList) {
+// issues（検出されたポイント）の中から優先度の高いものを最大N個選ぶ。
+function getPriorityIssues(issuesList, max) {
   const priority = { danger: 0, warn: 1, good: 2 };
-  const sorted = issuesList
+  return issuesList
     .filter(i => i.level !== 'good')
-    .sort((a, b) => priority[a.level] - priority[b.level]);
-  const top3 = sorted.slice(0, 3);
+    .sort((a, b) => priority[a.level] - priority[b.level])
+    .slice(0, max);
+}
+
+function buildChecklist(issuesList) {
+  const top3 = getPriorityIssues(issuesList, 3);
   if (!top3.length) {
     return ['特に急いで確認すべき懸念点は見つかりませんでした。念のため保証内容や工程表を確認しておくと安心です。'];
   }
   return top3.map(i => `${i.level === 'danger' ? '🔴' : '🟡'} ${i.title}`);
+}
+
+/* ---- フェーズ2: 診断結果に応じた確認質問の自動生成 ---- */
+// 既存のissueタイトル（calculateDiagnostic内のissues.pushで使われる文言）をキーに、
+// 業者にそのまま送れる質問文を対応させる。
+const ISSUE_QUESTION_TEMPLATES = {
+  '相場よりかなり安い金額です（手抜き・工程省略のリスク）': '見積書を確認したところ、相場よりかなり安い金額でした。その分、下地処理や塗装回数などの工程を省略されているのでしょうか？含まれる工程を具体的に教えてください。',
+  '相場よりやや安めの金額です': '見積書を確認したところ、相場よりやや安めの金額でした。含まれる工程やグレードについて、念のため教えてください。',
+  '相場よりやや高めの金額です': '見積書を確認したところ、相場よりやや高めの金額でした。金額の内訳（諸経費や仮設費など）を詳しく教えてください。',
+  '「一式」表記が多く、内訳が不透明です': '見積書を確認したところ、「一式」という表記が多く、数量ごとの内訳が分かりませんでした。㎡やmごとの内訳を教えてください。',
+  '塗料のメーカー名・商品名が不明です': '見積書を確認したところ、使用する塗料のメーカー名・正式な商品名が分かりませんでした。具体的な製品名を教えてください。',
+  '下地補修・シーリングの記載がありません': '見積書を確認したところ、シーリング工事や下地補修の施工範囲が分かりませんでした。今回の工事では、どの部分が施工対象になりますか？',
+  '改修ドレン（排水口）の記載がありません': '見積書を確認したところ、改修ドレン（排水口の交換）についての記載が見当たりませんでした。今回の工事に含まれていますか？',
+  '大幅な値引きや契約を急がせる表現があります': '見積書を確認したところ、大幅な値引きや契約を急がせるような記載がありました。値引き前の金額の根拠を教えてください。'
+};
+
+// 「確認した方がいいポイント」上位3つに対応する質問文を生成する。
+function buildAutoQuestions(issuesList) {
+  const top3 = getPriorityIssues(issuesList, 3);
+  return top3.map(i => '・' + (ISSUE_QUESTION_TEMPLATES[i.title] || `見積書を確認したところ、「${i.title}」という点が気になりました。詳しく教えてください。`));
+}
+
+/* ---- フェーズ2: 専門用語のかんたん解説 ---- */
+const GLOSSARY = {
+  'シーリング': 'コーキングとも呼ばれる、外壁のつなぎ目やサッシまわりに詰めるゴム状の防水材です。劣化すると隙間から雨水が入り込む原因になります。',
+  '下塗り': '塗装で一番最初に塗る工程です。下地と上の塗料をしっかり密着させる役割があり、ここを省くと塗料が剥がれやすくなります。',
+  '中塗り': '下塗りの上に塗る2回目の塗装です。色や耐久性を出す役割があります。',
+  '上塗り': '最後に塗る仕上げの塗装です。見た目の色つやと、雨風から建物を守る役割を持ちます。',
+  '下地処理': '塗装前に、ひび割れの補修や汚れ・古い塗膜の除去などを行う工程の総称です。ここを丁寧に行うかどうかで、仕上がりの持ちが大きく変わります。',
+  'クラック': '外壁などに入るひび割れのことです。放置すると雨水が浸入し、建物の劣化を早めます。',
+  '改修ドレン': 'バルコニーや屋上にある排水口（ドレン）を新しく交換する工事です。ここが劣化していると雨漏りの直接の原因になります。',
+  'FRP防水': 'ガラス繊維強化プラスチックを使った防水工法です。硬くて丈夫なため、ベランダやバルコニーでよく使われます。',
+  'ウレタン防水': '液状のウレタン樹脂を塗って防水層をつくる工法です。複雑な形状の場所にも施工しやすいのが特徴です。',
+  '塩ビシート防水': '塩化ビニール製のシートを貼って防水層をつくる工法です。広い屋上などで多く使われます。',
+  'シリコン塗料': '外壁塗装で広く使われている、価格と耐久性のバランスが良い標準的なグレードの塗料です。',
+  'フッ素塗料': 'シリコンより耐久性が高いグレードの塗料です。その分、価格もやや高くなります。',
+  '無機塗料': '現在市販されている塗料の中で、最も耐久性が高いとされるグレードの塗料です。'
+};
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// 診断結果の文章中に専門用語が出てきたら、タップで説明を見られるようにする。
+// （対象はプレーンテキストの結果表示のみ。コピー用のテンプレート文には適用しない）
+function linkifyGlossary(html) {
+  let out = html;
+  Object.keys(GLOSSARY).forEach(term => {
+    const re = new RegExp(escapeRegExp(term), 'g');
+    out = out.replace(re, `<span class="glossary-term" onclick="showGlossary('${term}')">${term}</span>`);
+  });
+  return out;
+}
+
+function showGlossary(term) {
+  const def = GLOSSARY[term];
+  if (!def) return;
+  document.getElementById('modal-body').innerHTML = `
+    <h3 style="margin-top:0;">📖 ${term}</h3>
+    <p style="font-size:14px;color:#4a5568;line-height:1.7;">${def}</p>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
 }
 
 let lastDiagnosis = null; // 直近の診断結果（履歴保存・相談送信に使う）
@@ -959,14 +1025,14 @@ function calculateDiagnostic(e) {
   }
 
   const issueList = document.getElementById('issue-list');
-  issueList.innerHTML = issues.map(i => `
+  issueList.innerHTML = linkifyGlossary(issues.map(i => `
     <div class="issue-item ${i.level}">
       <strong>${i.title}</strong><span class="tag">${i.tag}</span>
       <div style="margin-top: 4px; color: #4a5568;">${i.desc}</div>
     </div>
-  `).join('') || '<p style="font-size:13px;color:#718096;">特筆すべき懸念点は見つかりませんでした。</p>';
+  `).join('') || '<p style="font-size:13px;color:#718096;">特筆すべき懸念点は見つかりませんでした。</p>');
 
-  document.getElementById('ai-explain').innerHTML = `<p><span class="persona">AI診断士：</span>${persona}</p>`;
+  document.getElementById('ai-explain').innerHTML = linkifyGlossary(`<p><span class="persona">AI診断士：</span>${persona}</p>`);
 
   /* ---- フェーズ1: 5項目評価 ---- */
   const subScores = computeSubScores({ priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod });
@@ -989,11 +1055,11 @@ function calculateDiagnostic(e) {
   if (priceJudgement.tone === 'danger') {
     pricePointsHint.textContent = '確認ポイント：';
     pricePointsHint.style.display = 'block';
-    pricePointsEl.innerHTML = CHEAP_CHECK_POINTS.map(p => `<li>${p}</li>`).join('');
+    pricePointsEl.innerHTML = linkifyGlossary(CHEAP_CHECK_POINTS.map(p => `<li>${p}</li>`).join(''));
   } else if (priceJudgement.label === 'やや高め') {
     pricePointsHint.textContent = '高くなっている理由の候補：';
     pricePointsHint.style.display = 'block';
-    pricePointsEl.innerHTML = EXPENSIVE_REASON_POINTS.map(p => `<li>${p}</li>`).join('');
+    pricePointsEl.innerHTML = linkifyGlossary(EXPENSIVE_REASON_POINTS.map(p => `<li>${p}</li>`).join(''));
   } else {
     pricePointsHint.style.display = 'none';
     pricePointsEl.innerHTML = '';
@@ -1001,19 +1067,21 @@ function calculateDiagnostic(e) {
 
   /* ---- フェーズ1: この診断になった理由 ---- */
   const reasonLines = buildReasonList({ wallOn, roofOn, balconyOn, rooftopOn, paintActive, waterActive });
-  document.getElementById('reason-list').innerHTML = reasonLines.map(l => `<li>${l}</li>`).join('');
+  document.getElementById('reason-list').innerHTML = linkifyGlossary(reasonLines.map(l => `<li>${l}</li>`).join(''));
 
   /* ---- フェーズ1: 確認した方がいいポイント（最大3つ） ---- */
   const checklistLines = buildChecklist(issues);
-  document.getElementById('checklist-list').innerHTML = checklistLines.map(l => `<li>${l}</li>`).join('');
+  document.getElementById('checklist-list').innerHTML = linkifyGlossary(checklistLines.map(l => `<li>${l}</li>`).join(''));
 
   /* ---- 確認フレーズ ---- */
   const container = document.getElementById('template-container');
   let html = '';
+  const autoQuestions = buildAutoQuestions(issues);
+  if (autoQuestions.length) html += buildTemplateSection('診断結果からのおすすめ質問', autoQuestions, 'auto');
   html += buildTemplateSection('お見積り全体について', qGeneral, 'general');
   if (paintActive) html += buildTemplateSection('塗装工事について', qPaint, 'paint');
   if (waterActive) html += buildTemplateSection('防水工事について', qWater, 'water');
-  if (!qGeneral.length && !qPaint.length && !qWater.length) {
+  if (!autoQuestions.length && !qGeneral.length && !qPaint.length && !qWater.length) {
     html = `<div class="template-section"><div class="template-box" id="tmpl-none">特に気になる点は見つかりませんでした。念のため、施工時の工程表や保証内容について確認しておくと安心です。\n\n・工事の工程表（何日目に何を行うか）を教えていただけますか？\n・保証書は発行していただけますか？保証の対象範囲も教えてください。</div><button type="button" class="btn-copy" onclick="copyTemplate('tmpl-none', this)">コピーする</button></div>`;
   }
   container.innerHTML = html;
@@ -1198,6 +1266,7 @@ function setupLeadCard(diagnosis) {
     const contact = document.getElementById('lead-contact').value.trim();
     if (!name || !contact) { alert('お名前と、電話番号かメールアドレスのいずれかをご入力ください。'); return; }
     const memo = document.getElementById('lead-memo').value.trim();
+    const topics = Array.from(document.querySelectorAll('.lead-topic:checked')).map(cb => cb.value);
 
     const submitBtn = form.querySelector('button[type=submit]');
     submitBtn.disabled = true;
@@ -1208,7 +1277,7 @@ function setupLeadCard(diagnosis) {
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
-          name, contact, memo,
+          name, contact, memo, topics,
           score: diagnosis.score,
           level: diagnosis.level,
           priceMan: diagnosis.priceMan,
