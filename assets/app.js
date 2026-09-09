@@ -71,6 +71,11 @@ const WARRANTY_KEYWORDS = ["保証書","保証期間","瑕疵保証","アフタ�
 const GRADE_LABELS = { urethane: 'ウレタン', silicon: 'シリコン', radical: 'ラジカル制御', fluorine: 'フッ素', inorganic: '無機' };
 const WATERPROOF_METHOD_LABELS = { urethane: 'ウレタン防水', frp: 'FRP防水', sheet: '塩ビシート防水' };
 
+/* ---- フェーズ3: 3社比較用のキーワード ---- */
+const SEALING_KEYWORDS = ["シーリング", "コーキング"];
+const SUBSTRATE_KEYWORDS = ["下地処理", "下地補修", "下地調整", "ケレン", "クラック補修", "カチオン", "サーフェサー"];
+const ATTACHED_WORK_KEYWORDS = ["付帯部", "破風", "鼻隠し", "軒天", "雨樋", "戸袋", "水切り", "笠木"];
+
 /* ==================== タブ切り替え ==================== */
 function initTabs() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -233,10 +238,15 @@ function clearSelectedFile() {
   if (selectedFileThumbUrl) { URL.revokeObjectURL(selectedFileThumbUrl); selectedFileThumbUrl = null; }
 }
 
-function setScanStatus(text, percent) {
-  const statusEl = document.getElementById('scan-status');
-  const progEl = document.getElementById('scan-progress');
-  const barEl = document.getElementById('scan-progress-bar');
+// ids を渡すと、単体診断の読み込み状況表示（#scan-status等）以外の場所
+// （フェーズ3の3社比較の各社スロットなど）にも同じ仕組みで進捗を表示できる。
+// 省略した場合は今まで通り単体診断の表示要素を使うため、既存の挙動は変わらない。
+function setScanStatus(text, percent, ids) {
+  ids = ids || { status: 'scan-status', progress: 'scan-progress', bar: 'scan-progress-bar' };
+  const statusEl = document.getElementById(ids.status);
+  const progEl = document.getElementById(ids.progress);
+  const barEl = document.getElementById(ids.bar);
+  if (!statusEl || !progEl || !barEl) return;
   if (text === null) { statusEl.style.display = 'none'; progEl.style.display = 'none'; return; }
   statusEl.style.display = 'block';
   statusEl.innerText = text;
@@ -312,7 +322,7 @@ function getTesseractWorkerPath() {
   return tesseractWorkerBlobUrlPromise;
 }
 
-async function extractTextFromPDF(file) {
+async function extractTextFromPDF(file, statusIds) {
   const buf = await file.arrayBuffer();
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -325,19 +335,19 @@ async function extractTextFromPDF(file) {
   }
   // テキストがほぼ無い＝スキャン画像PDFの可能性 → OCRへフォールバック
   if (text.replace(/\s/g, '').length < 20) {
-    setScanStatus('画像として認識しています（少し時間がかかります）…', 20);
+    setScanStatus('画像として認識しています（少し時間がかかります）…', 20, statusIds);
     const page = await pdf.getPage(1);
     const viewport = page.getViewport({ scale: 2.0 });
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width; canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    text = await ocrCanvas(canvas);
+    text = await ocrCanvas(canvas, statusIds);
   }
   return text;
 }
 
-async function extractTextFromImage(file) {
-  return await ocrFile(file);
+async function extractTextFromImage(file, statusIds) {
+  return await ocrFile(file, statusIds);
 }
 
 // 文字認識の精度を上げるため、グレースケール化＋コントラスト強調を行う。
@@ -384,12 +394,12 @@ async function prepareImageForOcr(file) {
   }
 }
 
-async function ocrFile(file) {
+async function ocrFile(file, statusIds) {
   const workerPath = await getTesseractWorkerPath();
   const options = {
     logger: m => {
       if (m.status === 'recognizing text') {
-        setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70));
+        setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70), statusIds);
       }
     }
   };
@@ -398,12 +408,12 @@ async function ocrFile(file) {
   const { data } = await Tesseract.recognize(source, 'jpn+eng', options);
   return data.text;
 }
-async function ocrCanvas(canvas) {
+async function ocrCanvas(canvas, statusIds) {
   const workerPath = await getTesseractWorkerPath();
   const options = {
     logger: m => {
       if (m.status === 'recognizing text') {
-        setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70));
+        setScanStatus('文字を読み取っています…', 20 + Math.round(m.progress * 70), statusIds);
       }
     }
   };
@@ -540,6 +550,38 @@ function analyzeText(text) {
   result.hasRooftop = ROOFTOP_KEYWORDS.some(k => text.includes(k)) && !result.hasBalcony;
 
   return result;
+}
+
+/* ---- フェーズ3: 3社比較用のテキスト解析（既存のanalyzeTextを流用し、比較に必要な項目だけ追加で判定する） ----
+   analyzeTextはDOMを一切書き換えない純粋な関数なので、単体診断とは別に何度呼び出しても
+   既存の診断結果には影響しない。 */
+function analyzeForCompare(text) {
+  const base = analyzeText(text);
+
+  const hasSealing = SEALING_KEYWORDS.some(k => text.includes(k));
+  const hasSubstrate = SUBSTRATE_KEYWORDS.some(k => text.includes(k));
+  const hasAttachedWork = ATTACHED_WORK_KEYWORDS.some(k => text.includes(k));
+  const hasWaterproofWork = base.hasBalcony || base.hasRooftop || base.hasWaterproofMethod;
+
+  let scaffold = '記載なし（不明）';
+  if (base.hasScaffold) {
+    const idx = text.indexOf('足場');
+    const around = text.slice(Math.max(0, idx - 10), idx + 20);
+    scaffold = /別途|別料金/.test(around) ? '別途（追加費用の可能性）' : '見積りに含まれている様子';
+  }
+
+  let warranty = '記載なし（不明）';
+  if (base.hasWarranty) {
+    const warrantyMatch = text.match(/([0-9]+)\s*年[^0-9]{0,6}保証|保証[^0-9]{0,6}([0-9]+)\s*年/);
+    warranty = warrantyMatch ? `${warrantyMatch[1] || warrantyMatch[2]}年保証の記載あり` : '保証についての記載あり（詳細は要確認）';
+  }
+
+  return {
+    totalPriceMan: base.totalPriceMan,
+    areaWall: base.areaWall, areaRoof: base.areaRoof, areaBalcony: base.areaBalcony, areaRooftop: base.areaRooftop, areaSqm: base.areaSqm,
+    grade: base.grade, manufacturers: base.manufacturers, waterproofMethod: base.waterproofMethod,
+    hasSealing, hasSubstrate, hasAttachedWork, hasWaterproofWork, scaffold, warranty
+  };
 }
 
 function applyExtractedData(d) {
@@ -1102,7 +1144,10 @@ function calculateDiagnostic(e) {
     expectedMax: expectedMaxMan,
     scopeSummary: scopeParts.join('、'),
     grade,
-    issues: issues.map(i => ({ level: i.level, tag: i.tag, title: i.title }))
+    issues: issues.map(i => ({ level: i.level, tag: i.tag, title: i.title })),
+    // ---- フェーズ3: 履歴の価格判定・5項目評価の追加表示用 ----
+    priceJudgement: { icon: priceJudgement.icon, label: priceJudgement.label, tone: priceJudgement.tone },
+    subScores: subScores.map(s => ({ key: s.key, label: s.label, score: s.score, desc: s.desc }))
   };
   saveHistoryRecord(lastDiagnosis);
   setupLeadCard(lastDiagnosis);
@@ -1141,6 +1186,186 @@ function copyTemplate(id, btn) {
     btn.classList.add('copied');
     setTimeout(() => { btn.innerText = original; btn.classList.remove('copied'); }, 1800);
   }).catch(() => { alert('コピーに失敗しました。テキストを長押しして手動でコピーしてください。'); });
+}
+
+/* ==================== フェーズ3: 3社見積もり比較 ====================
+   単体の診断（診断する タブ）とは完全に独立した機能。既存のOCR・PDF読み取り部品
+   （extractTextFromPDF/extractTextFromImage）と、テキスト解析（analyzeForCompare）を
+   3つのスロット分だけ再利用する。単体診断のフォーム・結果表示には一切書き込まない。
+==================================================================== */
+let compareTexts = [null, null, null]; // 各社の読み取り済みテキスト（正規化済み）
+let compareFileThumbUrls = [null, null, null];
+
+function initCompareUpload() {
+  for (let n = 1; n <= 3; n++) {
+    const slot = n;
+    const dropZone = document.getElementById(`compare-drop-${slot}`);
+    const fileInput = document.getElementById(`compare-file-${slot}`);
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleCompareFile(slot, e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files.length) handleCompareFile(slot, e.target.files[0]); });
+  }
+}
+
+function compareStatusIds(slot) {
+  return { status: `compare-status-${slot}`, progress: `compare-progress-${slot}`, bar: `compare-progress-bar-${slot}` };
+}
+
+async function showCompareFile(slot, file) {
+  const info = document.getElementById(`compare-file-info-${slot}`);
+  const nameEl = document.getElementById(`compare-file-name-${slot}`);
+  const thumbEl = document.getElementById(`compare-file-thumb-${slot}`);
+
+  nameEl.textContent = file.name;
+  info.classList.add('show');
+
+  if (compareFileThumbUrls[slot - 1]) { URL.revokeObjectURL(compareFileThumbUrls[slot - 1]); compareFileThumbUrls[slot - 1] = null; }
+  thumbEl.classList.remove('show');
+  thumbEl.removeAttribute('src');
+
+  if (file.type.startsWith('image/')) {
+    compareFileThumbUrls[slot - 1] = URL.createObjectURL(file);
+    thumbEl.src = compareFileThumbUrls[slot - 1];
+    thumbEl.classList.add('show');
+  } else if (file.type === 'application/pdf') {
+    try {
+      const dataUrl = await renderPdfThumbnail(file);
+      if (dataUrl && document.getElementById(`compare-file-name-${slot}`).textContent === file.name) {
+        thumbEl.src = dataUrl;
+        thumbEl.classList.add('show');
+      }
+    } catch (err) {
+      console.warn('PDFのプレビュー画像を作成できませんでした。', err);
+    }
+  }
+}
+
+function clearCompareFile(slot) {
+  document.getElementById(`compare-file-info-${slot}`).classList.remove('show');
+  document.getElementById(`compare-file-${slot}`).value = '';
+  if (compareFileThumbUrls[slot - 1]) { URL.revokeObjectURL(compareFileThumbUrls[slot - 1]); compareFileThumbUrls[slot - 1] = null; }
+  compareTexts[slot - 1] = null;
+}
+
+async function handleCompareFile(slot, file) {
+  showCompareFile(slot, file);
+
+  const isPdf = file.type === 'application/pdf';
+  const isImage = file.type.startsWith('image/');
+  const statusIds = compareStatusIds(slot);
+
+  if (!isPdf && !isImage) {
+    alert('画像（JPG/PNG）またはPDFファイルを選択してください。');
+    return;
+  }
+  if (isPdf && typeof pdfjsLib === 'undefined') {
+    alert('PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。お手数ですが、見積書の文字を「文章を貼り付ける」欄にコピーして貼り付けてください。');
+    return;
+  }
+  if (isImage && typeof Tesseract === 'undefined') {
+    alert('写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。お手数ですが、見積書の文字を「文章を貼り付ける」欄にコピーして貼り付けてください。');
+    return;
+  }
+
+  try {
+    setScanStatus('見積書を読み込んでいます…', 5, statusIds);
+    const extractPromise = isPdf ? extractTextFromPDF(file, statusIds) : extractTextFromImage(file, statusIds);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000));
+    const text = await Promise.race([extractPromise, timeoutPromise]);
+    compareTexts[slot - 1] = normalizeText(text);
+    setScanStatus(null, null, statusIds);
+  } catch (err) {
+    console.error(err);
+    setScanStatus(null, null, statusIds);
+    compareTexts[slot - 1] = null;
+    if (err && err.message === 'TIMEOUT') {
+      alert('30秒待っても読み込みが完了しませんでした。お手数ですが、見積書の文字を「文章を貼り付ける」欄にコピーして貼り付けてください。');
+    } else {
+      alert('読み込み中にエラーが発生しました。お手数ですが、下の「文章を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (err && err.message ? err.message : err) + ')');
+    }
+  }
+}
+
+function analyzeComparePastedText(slot) {
+  const raw = document.getElementById(`compare-paste-${slot}`).value;
+  if (!raw.trim()) { alert('文章を貼り付けてください。'); return; }
+  compareTexts[slot - 1] = normalizeText(raw);
+  alert(`${slot}社目の文章を読み込みました。「この内容で比較する」ボタンから比較できます。`);
+}
+
+const COMPARE_ROWS = [
+  { key: 'price', label: '価格' },
+  { key: 'area', label: '施工面積' },
+  { key: 'material', label: '使用塗料・工法' },
+  { key: 'sealing', label: 'シーリング工事の有無' },
+  { key: 'substrate', label: '下地処理の有無' },
+  { key: 'scaffold', label: '足場の扱い' },
+  { key: 'waterproof', label: '防水工事の有無' },
+  { key: 'attached', label: '付帯部工事の有無' },
+  { key: 'warranty', label: '保証内容' }
+];
+
+// 各社の項目を文字列化する。ここでは価格の大小による強調・並び替えは一切行わない
+// （「最安値」「おすすめ」を示唆する表示をしないため）。
+function formatCompareCell(key, c) {
+  switch (key) {
+    case 'price':
+      return c.totalPriceMan ? `${c.totalPriceMan}万円` : '不明';
+    case 'area': {
+      const parts = [];
+      if (c.areaWall) parts.push(`外壁${c.areaWall}㎡`);
+      if (c.areaRoof) parts.push(`屋根${c.areaRoof}㎡`);
+      if (c.areaBalcony) parts.push(`バルコニー${c.areaBalcony}㎡`);
+      if (c.areaRooftop) parts.push(`屋上${c.areaRooftop}㎡`);
+      if (!parts.length && c.areaSqm) parts.push(`約${c.areaSqm}㎡`);
+      return parts.length ? parts.join('<br>') : '不明';
+    }
+    case 'material': {
+      const parts = [];
+      if (c.grade) parts.push(GRADE_LABELS[c.grade] + '塗料');
+      if (c.waterproofMethod) parts.push(WATERPROOF_METHOD_LABELS[c.waterproofMethod]);
+      if (c.manufacturers && c.manufacturers.length) parts.push(c.manufacturers.join('・'));
+      return parts.length ? parts.join('<br>') : '不明';
+    }
+    case 'sealing': return c.hasSealing ? '記載あり' : '記載なし（不明）';
+    case 'substrate': return c.hasSubstrate ? '記載あり' : '記載なし（不明）';
+    case 'scaffold': return c.scaffold;
+    case 'waterproof': return c.hasWaterproofWork ? '記載あり' : '記載なし';
+    case 'attached': return c.hasAttachedWork ? '記載あり' : '記載なし';
+    case 'warranty': return c.warranty;
+    default: return '';
+  }
+}
+
+function runCompare() {
+  const slots = [1, 2, 3].filter(i => compareTexts[i - 1]);
+  if (!slots.length) {
+    alert('少なくとも1社分の見積書を読み込むか、文章を貼り付けて解析してください。');
+    return;
+  }
+
+  const companies = slots.map(i => analyzeForCompare(compareTexts[i - 1]));
+
+  let html = '<table class="compare-table"><thead><tr><th>項目</th>';
+  slots.forEach((i, idx) => { html += `<th>${idx + 1}社目</th>`; });
+  html += '</tr></thead><tbody>';
+  COMPARE_ROWS.forEach(row => {
+    html += `<tr><th>${row.label}</th>`;
+    companies.forEach(c => { html += `<td>${formatCompareCell(row.key, c)}</td>`; });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  document.getElementById('compare-table-wrap').innerHTML = linkifyGlossary(html);
+  const resultArea = document.getElementById('compare-result-area');
+  resultArea.style.display = 'block';
+  resultArea.scrollIntoView({ behavior: 'smooth' });
 }
 
 /* ==================== 診断履歴（この端末に保存） ==================== */
@@ -1192,6 +1417,7 @@ function renderHistory() {
         <span class="history-score ${r.level}">${r.score}点 ${levelLabel(r.level)}</span>
       </div>
       <div class="history-sub">${r.scopeSummary || '工事内容未設定'} ／ 見積 ${r.priceMan}万円</div>
+      ${r.priceJudgement ? `<div class="history-sub2">価格判定：${r.priceJudgement.icon} ${r.priceJudgement.label}</div>` : ''}
     </div>
   `).join('');
 }
@@ -1199,6 +1425,27 @@ function showHistoryDetail(id) {
   const r = loadHistory().find(x => x.id === id);
   if (!r) return;
   const body = document.getElementById('modal-body');
+
+  // フェーズ3以前に保存された古い履歴データには priceJudgement / subScores が
+  // 存在しないため、あればその項目だけ追加表示する（無くてもエラーにならないようにする）。
+  const priceJudgementHtml = r.priceJudgement
+    ? `<p style="font-size:13px;color:#4a5568;"><b>価格判定：</b>${r.priceJudgement.icon} ${r.priceJudgement.label}</p>`
+    : '';
+  const subScoreHtml = (r.subScores && r.subScores.length)
+    ? `<div class="card" style="margin:10px 0 14px;">
+        <h2 style="font-size:13px;">📊 5項目でみる診断結果</h2>
+        <div class="subscore-list">${r.subScores.map(s => {
+          const tone = subscoreTone(s.score);
+          const valueText = s.score === null ? '判断材料不足' : s.score + '点';
+          const barWidth = s.score === null ? 0 : s.score;
+          return `<div class="subscore-item">
+            <div class="subscore-head"><span>${s.label}</span><span class="subscore-value ${tone}">${valueText}</span></div>
+            <div class="subscore-bar"><div class="subscore-bar-fill ${tone}" style="width:${barWidth}%;"></div></div>
+          </div>`;
+        }).join('')}</div>
+      </div>`
+    : '';
+
   body.innerHTML = `
     <h3 style="margin-top:0;">${formatDate(r.timestamp)} の診断結果</h3>
     <div class="score-box ${r.level}" style="margin-bottom:14px;">
@@ -1207,6 +1454,8 @@ function showHistoryDetail(id) {
       <div class="price-compare">適正相場の目安：約 ${r.expectedMin}万円 〜 ${r.expectedMax}万円</div>
     </div>
     <p style="font-size:13px;color:#4a5568;"><b>工事内容：</b>${r.scopeSummary || '－'}<br><b>見積提示額：</b>${r.priceMan}万円</p>
+    ${priceJudgementHtml}
+    ${subScoreHtml}
     <div class="issue-list">
       ${(r.issues || []).map(i => `<div class="issue-item ${i.level}"><strong>${i.title}</strong><span class="tag">${i.tag}</span></div>`).join('') || '<p style="font-size:13px;color:#718096;">記録された懸念点はありません。</p>'}
     </div>
@@ -1303,6 +1552,92 @@ function setupLeadCard(diagnosis) {
   };
 }
 
+/* ==================== フェーズ3: 診断結果の共有（URL） ====================
+   診断結果そのものではなく、診断に使った「入力内容」をURLに埋め込んで共有する。
+   共有されたリンクを開くと、同じ入力内容から診断が自動で再実行され、
+   まったく同じ結果が表示される（既存の診断ロジック・表示は一切変更しない）。
+==================================================================== */
+function buildShareUrl() {
+  const state = {
+    w: document.getElementById('chk-wall').checked ? 1 : 0,
+    r: document.getElementById('chk-roof').checked ? 1 : 0,
+    b: document.getElementById('chk-balcony').checked ? 1 : 0,
+    t: document.getElementById('chk-rooftop').checked ? 1 : 0,
+    aw: document.getElementById('area-wall').value,
+    ar: document.getElementById('area-roof').value,
+    ab: document.getElementById('area-balcony').value,
+    at: document.getElementById('area-rooftop').value,
+    price: document.getElementById('total-price').value,
+    grade: document.getElementById('paint-grade').value,
+    method: document.getElementById('waterproof-method').value,
+    disc: document.getElementById('discount-amount').value,
+    isk: document.getElementById('chk-isshiki').checked ? 1 : 0,
+    np: document.getElementById('chk-no-paint-name').checked ? 1 : 0,
+    nr: document.getElementById('chk-no-repair').checked ? 1 : 0,
+    nd: document.getElementById('chk-no-drain').checked ? 1 : 0,
+    ps: document.getElementById('chk-pushy').checked ? 1 : 0
+  };
+  const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(state)))));
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('share', encoded);
+  return url.toString();
+}
+
+async function shareResult() {
+  if (!lastDiagnosis) return;
+  const url = buildShareUrl();
+  const shareText = `見積もり診断結果（${lastDiagnosis.score}点）を共有します。`;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: '見積もり適正診断の結果', text: shareText, url });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // ユーザーが共有をキャンセルした場合は何もしない
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('共有用のリンクをコピーしました。LINEやメールに貼り付けてお使いください。');
+  } catch (e) {
+    prompt('以下のリンクをコピーしてお使いください。', url);
+  }
+}
+
+// ページ読み込み時に ?share=... が付いていれば、その内容をフォームに反映する。
+// 読み込みに失敗した場合は通常どおりの初期状態に戻す（エラーにはしない）。
+function applySharedStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const encoded = params.get('share');
+  if (!encoded) return false;
+  try {
+    const json = decodeURIComponent(escape(atob(decodeURIComponent(encoded))));
+    const state = JSON.parse(json);
+    document.getElementById('chk-wall').checked = !!state.w;
+    document.getElementById('chk-roof').checked = !!state.r;
+    document.getElementById('chk-balcony').checked = !!state.b;
+    document.getElementById('chk-rooftop').checked = !!state.t;
+    document.getElementById('area-wall').value = state.aw;
+    document.getElementById('area-roof').value = state.ar;
+    document.getElementById('area-balcony').value = state.ab;
+    document.getElementById('area-rooftop').value = state.at;
+    document.getElementById('total-price').value = state.price;
+    document.getElementById('paint-grade').value = state.grade;
+    document.getElementById('waterproof-method').value = state.method;
+    document.getElementById('discount-amount').value = state.disc;
+    document.getElementById('chk-isshiki').checked = !!state.isk;
+    document.getElementById('chk-no-paint-name').checked = !!state.np;
+    document.getElementById('chk-no-repair').checked = !!state.nr;
+    document.getElementById('chk-no-drain').checked = !!state.nd;
+    document.getElementById('chk-pushy').checked = !!state.ps;
+    return true;
+  } catch (e) {
+    console.warn('共有リンクの読み込みに失敗しました。通常の初期状態で表示します。', e);
+    return false;
+  }
+}
+
 /* ==================== ライブラリ状態表示 ==================== */
 function checkLibraries() {
   const box = document.getElementById('lib-status');
@@ -1326,13 +1661,25 @@ function checkLibraries() {
 document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initUpload();
+  initCompareUpload();
   document.getElementById('diag-form').addEventListener('submit', calculateDiagnostic);
   document.getElementById('history-clear-btn').addEventListener('click', clearHistory);
   document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') closeModal(); });
+  document.getElementById('compare-run-btn').addEventListener('click', runCompare);
 
-  document.getElementById('chk-wall').checked = true;
-  document.getElementById('chk-rooftop').checked = true;
+  // ---- フェーズ3: 共有リンク（?share=...）からの読み込み ----
+  // 共有された内容がある場合はそちらを優先し、無ければ今まで通りの初期値（サンプル用チェック）を入れる。
+  const sharedLoaded = applySharedStateFromUrl();
+  if (!sharedLoaded) {
+    document.getElementById('chk-wall').checked = true;
+    document.getElementById('chk-rooftop').checked = true;
+  }
   onScopeChange();
   onAreaChange();
   checkLibraries();
+
+  if (sharedLoaded) {
+    document.getElementById('shared-notice').style.display = 'block';
+    calculateDiagnostic({ preventDefault: () => {} });
+  }
 });
