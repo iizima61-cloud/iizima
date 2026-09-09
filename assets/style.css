@@ -134,7 +134,36 @@ input[type="number"], select, input[type="text"], input[type="tel"], input[type=
 .score-box.danger { background: var(--danger-bg); border: 2px solid var(--danger-border); }
 .score-title { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
 .score-badge { font-size: 32px; font-weight: bold; margin: 6px 0; }
+.score-meaning { font-size: 13px; font-weight: bold; color: #2d3748; margin: 2px 0 8px; }
 .price-compare { font-size: 13px; color: #4a5568; margin-top: 6px; }
+
+/* ==================== フェーズ1: 診断結果の詳細表示 ==================== */
+.disclaimer-box { background:#f7fafc; border:1px solid var(--border); border-radius:10px; padding:12px 14px; font-size:11px; color:var(--sub); line-height:1.6; margin-bottom:16px; }
+
+.subscore-list { display:flex; flex-direction:column; gap:10px; margin-top: 4px; }
+.subscore-item { }
+.subscore-item .subscore-head { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; font-weight:bold; margin-bottom:4px; }
+.subscore-item .subscore-head .subscore-value { font-weight:bold; }
+.subscore-item .subscore-head .subscore-value.good { color: var(--good); }
+.subscore-item .subscore-head .subscore-value.warn { color: var(--warn); }
+.subscore-item .subscore-head .subscore-value.danger { color: var(--danger); }
+.subscore-item .subscore-head .subscore-value.neutral { color: var(--sub); }
+.subscore-bar { background:#e2e8f0; border-radius:5px; height:9px; overflow:hidden; }
+.subscore-bar-fill { height:100%; border-radius:5px; }
+.subscore-bar-fill.good { background: var(--good); }
+.subscore-bar-fill.warn { background: var(--warn); }
+.subscore-bar-fill.danger { background: var(--danger); }
+.subscore-bar-fill.neutral { background: #cbd5e0; }
+.subscore-item .subscore-desc { font-size:12px; color:var(--sub); margin-top:4px; }
+
+.price-judgement-badge { display:inline-block; font-size:14px; font-weight:bold; padding:6px 14px; border-radius:20px; background:#edf2f7; color:#2d3748; margin-bottom:8px; }
+.price-judgement-hint { font-size: 12px; font-weight: bold; color: #2d3748; margin: 4px 0 2px; }
+.price-judgement-points { margin: 0 0 0; padding-left: 20px; font-size: 12px; color: #4a5568; }
+.price-judgement-points li { margin-bottom: 4px; }
+
+.reason-list, .checklist-list { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: #4a5568; }
+.reason-list li, .checklist-list li { margin-bottom: 6px; }
+.checklist-list { font-weight: bold; color: #2d3748; }
 
 .gauge-wrap { background:#e2e8f0; border-radius: 6px; height: 14px; margin: 10px 0; position: relative; overflow: visible; }
 .gauge-fill { background: linear-gradient(90deg,#68d391,#f6ad55,#fc8181); height: 100%; border-radius: 6px; }

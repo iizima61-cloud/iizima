@@ -187,15 +187,42 @@
           <div class="score-title" id="score-title">診断結果</div>
           <div class="score-badge" id="score-badge">75点</div>
           <div class="gauge-wrap"><div class="gauge-fill" id="gauge-fill" style="width:100%;"></div><div class="gauge-marker" id="gauge-marker" style="left:75%;"></div></div>
+          <div class="score-meaning" id="score-meaning"></div>
           <div id="score-desc" style="font-size: 14px;"></div>
           <div class="price-compare" id="price-compare"></div>
         </div>
 
+        <div id="disclaimer-box" class="disclaimer-box">
+          この診断は、入力された見積書の内容や一般的な価格情報などをもとにした簡易チェックです。実際の工事価格は、建物の状態、施工条件、地域、材料、施工範囲などによって変わります。最終的な判断には現地調査や複数社の見積もりをご活用ください。
+        </div>
+
         <div id="result-file-info" class="selected-file-info result-file-info"></div>
+
+        <div class="card" id="subscore-card">
+          <h2>📊 5項目でみる診断結果</h2>
+          <div id="subscore-list" class="subscore-list"></div>
+        </div>
+
+        <div class="card" id="price-judgement-card">
+          <h2>💴 価格判定</h2>
+          <div id="price-judgement-badge" class="price-judgement-badge"></div>
+          <p id="price-judgement-hint" class="price-judgement-hint" style="display:none;"></p>
+          <ul id="price-judgement-points" class="price-judgement-points"></ul>
+        </div>
 
         <div class="card">
           <h2>🔍 検出されたポイント</h2>
           <div id="issue-list" class="issue-list"></div>
+        </div>
+
+        <div class="card" id="reason-card">
+          <h2>📝 この診断になった理由</h2>
+          <ul id="reason-list" class="reason-list"></ul>
+        </div>
+
+        <div class="card" id="checklist-card">
+          <h2>☑️ 確認した方がいいポイント</h2>
+          <ol id="checklist-list" class="checklist-list"></ol>
         </div>
 
         <div class="card">
