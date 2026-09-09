@@ -1253,6 +1253,19 @@ function clearCompareFile(slot) {
   compareTexts[slot - 1] = null;
 }
 
+// 3社比較の各種メッセージは alert() を使わず、スロット内のステータス表示欄に
+// テキストで出す（フリーズ調査の対応：スマホでテキスト入力直後に同期的な
+// alert()を出すと、仮想キーボードが閉じるタイミングと重なって画面が
+// 反応しなくなったように見える端末があるため、既存のOCR進捗表示と同じ
+// 「非モーダルな」表示方法に統一する）。
+function showCompareMessage(slot, text, isError) {
+  const el = document.getElementById(`compare-status-${slot}`);
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.color = isError ? 'var(--danger)' : '';
+  el.innerText = text;
+}
+
 async function handleCompareFile(slot, file) {
   showCompareFile(slot, file);
 
@@ -1261,15 +1274,15 @@ async function handleCompareFile(slot, file) {
   const statusIds = compareStatusIds(slot);
 
   if (!isPdf && !isImage) {
-    alert('画像（JPG/PNG）またはPDFファイルを選択してください。');
+    showCompareMessage(slot, '⚠️ 画像（JPG/PNG）またはPDFファイルを選択してください。', true);
     return;
   }
   if (isPdf && typeof pdfjsLib === 'undefined') {
-    alert('PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。お手数ですが、見積書の文字を「文章を貼り付ける」欄にコピーして貼り付けてください。');
+    showCompareMessage(slot, '⚠️ PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
     return;
   }
   if (isImage && typeof Tesseract === 'undefined') {
-    alert('写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。お手数ですが、見積書の文字を「文章を貼り付ける」欄にコピーして貼り付けてください。');
+    showCompareMessage(slot, '⚠️ 写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
     return;
   }
 
@@ -1280,23 +1293,24 @@ async function handleCompareFile(slot, file) {
     const text = await Promise.race([extractPromise, timeoutPromise]);
     compareTexts[slot - 1] = normalizeText(text);
     setScanStatus(null, null, statusIds);
+    showCompareMessage(slot, '✅ 読み取りが完了しました。', false);
   } catch (err) {
     console.error(err);
     setScanStatus(null, null, statusIds);
     compareTexts[slot - 1] = null;
     if (err && err.message === 'TIMEOUT') {
-      alert('30秒待っても読み込みが完了しませんでした。お手数ですが、見積書の文字を「文章を貼り付ける」欄にコピーして貼り付けてください。');
+      showCompareMessage(slot, '⚠️ 30秒待っても読み込みが完了しませんでした。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
     } else {
-      alert('読み込み中にエラーが発生しました。お手数ですが、下の「文章を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (err && err.message ? err.message : err) + ')');
+      showCompareMessage(slot, '⚠️ 読み込み中にエラーが発生しました。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
     }
   }
 }
 
 function analyzeComparePastedText(slot) {
   const raw = document.getElementById(`compare-paste-${slot}`).value;
-  if (!raw.trim()) { alert('文章を貼り付けてください。'); return; }
+  if (!raw.trim()) { showCompareMessage(slot, '⚠️ 文章を貼り付けてください。', true); return; }
   compareTexts[slot - 1] = normalizeText(raw);
-  alert(`${slot}社目の文章を読み込みました。「この内容で比較する」ボタンから比較できます。`);
+  showCompareMessage(slot, `✅ ${slot}社目の文章を読み込みました。「この内容で比較する」ボタンから比較できます。`, false);
 }
 
 const COMPARE_ROWS = [
@@ -1345,10 +1359,15 @@ function formatCompareCell(key, c) {
 
 function runCompare() {
   const slots = [1, 2, 3].filter(i => compareTexts[i - 1]);
+  const runStatusEl = document.getElementById('compare-run-status');
   if (!slots.length) {
-    alert('少なくとも1社分の見積書を読み込むか、文章を貼り付けて解析してください。');
+    if (runStatusEl) {
+      runStatusEl.style.display = 'block';
+      runStatusEl.innerText = '⚠️ 少なくとも1社分の見積書を読み込むか、文章を貼り付けて解析してください。';
+    }
     return;
   }
+  if (runStatusEl) { runStatusEl.style.display = 'none'; runStatusEl.innerText = ''; }
 
   const companies = slots.map(i => analyzeForCompare(compareTexts[i - 1]));
 
