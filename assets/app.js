@@ -27,9 +27,13 @@ const PAINT_RATE = {
   unknown:   { min: 3000, max: 4500 }
 };
 const ROOF_FACTOR = 0.85; // 屋根は外壁よりやや単価が下がる目安
+
+// 防水1㎡あたりの相場（円）。工法によって変動する（バルコニー・屋上共通）。
 const WATERPROOF_RATE = {
-  balcony: { min: 5500, max: 9000 },
-  rooftop: { min: 4500, max: 7500 }
+  urethane: { min: 5000, max: 7500 },  // ウレタン防水（密着・通気緩衝工法など）
+  frp:      { min: 6500, max: 9500 },  // FRP防水
+  sheet:    { min: 6000, max: 12000 }, // 塩ビシート防水
+  unknown:  { min: 4500, max: 9000 }
 };
 
 const MANUFACTURER_KEYWORDS = [
@@ -56,6 +60,11 @@ const ROOF_KEYWORDS = ["屋根塗装","屋根"];
 const BALCONY_KEYWORDS = ["バルコニー防水","ベランダ防水","バルコニー","ベランダ"];
 const ROOFTOP_KEYWORDS = ["屋上防水","屋上"];
 const WATERPROOF_METHOD_KEYWORDS = ["ウレタン防水","FRP防水","塩ビシート","シート防水","通気緩衝","トップコート"];
+const WATERPROOF_METHOD_GRADE_KEYWORDS = [
+  { method: "sheet",    words: ["塩ビシート","シート防水"] },
+  { method: "frp",      words: ["FRP防水","ＦＲＰ防水"] },
+  { method: "urethane", words: ["ウレタン防水"] }
+];
 const SCAFFOLD_KEYWORDS = ["足場"];
 const WARRANTY_KEYWORDS = ["保証書","保証期間","瑕疵保証","アフター保証"];
 
@@ -441,7 +450,7 @@ function analyzeText(text) {
     totalPriceMan: null, areaSqm: null, grade: null, manufacturer: null,
     isshikiCount: 0, hasRepairKeywords: false, hasDrainKeyword: false,
     hasWall: false, hasRoof: false, hasBalcony: false, hasRooftop: false,
-    hasWaterproofMethod: false, hasScaffold: false, hasWarranty: false,
+    hasWaterproofMethod: false, waterproofMethod: null, hasScaffold: false, hasWarranty: false,
     discountMan: null, foundKeywords: []
   };
 
@@ -484,6 +493,11 @@ function analyzeText(text) {
   // ---- 塗料グレード ----
   for (const g of GRADE_KEYWORDS) {
     if (g.words.some(w => text.includes(w))) { result.grade = g.grade; break; }
+  }
+
+  // ---- 防水工法 ----
+  for (const wm of WATERPROOF_METHOD_GRADE_KEYWORDS) {
+    if (wm.words.some(w => text.includes(w))) { result.waterproofMethod = wm.method; break; }
   }
 
   // ---- メーカー・商品名 ----
@@ -571,6 +585,15 @@ function applyExtractedData(d) {
     document.getElementById('grade-auto').style.display = 'none';
   }
 
+  if (d.waterproofMethod) {
+    document.getElementById('waterproof-method').value = d.waterproofMethod;
+    document.getElementById('method-auto').style.display = 'inline-block';
+    const methodName = {urethane:'ウレタン防水', frp:'FRP防水', sheet:'塩ビシート防水'}[d.waterproofMethod];
+    reportLines.push(`🧴 防水工法として <b>「${methodName}」</b> という記載を見つけました。工法によって適正相場が変わるため、自動で反映しています。`);
+  } else {
+    document.getElementById('method-auto').style.display = 'none';
+  }
+
   if (d.manufacturers && d.manufacturers.length) {
     document.getElementById('chk-no-paint-name').checked = false;
     reportLines.push(`🏭 塗料メーカー・商品名として <b>「${d.manufacturers.join('」「')}」</b> の記載を確認しました。メーカー名がはっきりしているのは良い傾向です。`);
@@ -640,6 +663,7 @@ function calculateDiagnostic(e) {
 
   const price = parseFloat(document.getElementById('total-price').value);
   const grade = document.getElementById('paint-grade').value;
+  const waterproofMethod = document.getElementById('waterproof-method').value;
   const discount = parseFloat(document.getElementById('discount-amount').value) || 0;
 
   const isIsshiki = document.getElementById('chk-isshiki').checked;
@@ -650,11 +674,12 @@ function calculateDiagnostic(e) {
 
   // ---- 相場計算（円）----
   const paintRate = getPaintRateRange(grade);
+  const waterRate = WATERPROOF_RATE[waterproofMethod] || WATERPROOF_RATE.unknown;
   let expectedMin = 0, expectedMax = 0;
   if (wallOn) { expectedMin += areaWall * paintRate.min; expectedMax += areaWall * paintRate.max; }
   if (roofOn) { expectedMin += areaRoof * paintRate.min * ROOF_FACTOR; expectedMax += areaRoof * paintRate.max * ROOF_FACTOR; }
-  if (balconyOn) { expectedMin += areaBalcony * WATERPROOF_RATE.balcony.min; expectedMax += areaBalcony * WATERPROOF_RATE.balcony.max; }
-  if (rooftopOn) { expectedMin += areaRooftop * WATERPROOF_RATE.rooftop.min; expectedMax += areaRooftop * WATERPROOF_RATE.rooftop.max; }
+  if (balconyOn) { expectedMin += areaBalcony * waterRate.min; expectedMax += areaBalcony * waterRate.max; }
+  if (rooftopOn) { expectedMin += areaRooftop * waterRate.min; expectedMax += areaRooftop * waterRate.max; }
 
   const expectedMinMan = Math.round(expectedMin / 1000) / 10;
   const expectedMaxMan = Math.round(expectedMax / 1000) / 10;
