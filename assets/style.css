@@ -28,6 +28,9 @@ body {
 }
 .topbar h1 { font-size: 16px; margin: 0 0 2px; font-weight: bold; }
 .topbar p { font-size: 11px; margin: 0; opacity: .9; }
+.topbar-pitch { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.25); }
+.topbar-pitch h2 { font-size: 14px; margin: 0 0 4px; font-weight: bold; }
+.topbar-pitch p { font-size: 11px; margin: 0; opacity: .95; }
 
 main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 
@@ -53,6 +56,19 @@ main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 /* ==================== 共通カード ==================== */
 .intro { background:#ebf8ff; border:1px solid #bee3f8; border-radius:10px; padding:14px 16px; font-size:13px; color:#2c5282; margin-bottom:16px; }
 .intro b { color:#1a365d; }
+.steps-row { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; }
+.step-chip { flex:1 1 90px; background:#fff; border:1px solid #bee3f8; border-radius:8px; padding:8px 6px; font-size:11px; color:#2c5282; text-align:center; display:flex; flex-direction:column; align-items:center; gap:4px; }
+
+.hero-cta-btn { margin-bottom:14px; font-size:15px; }
+
+.ai-summary-card { background:#fff; border:1px solid #bee3f8; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+.ai-summary-card h3 { font-size:13px; margin:0 0 8px; color:var(--blue-dark); }
+.ai-summary-list { list-style:none; margin:0 0 10px; padding:0; }
+.ai-summary-list li { display:flex; justify-content:space-between; gap:8px; font-size:12.5px; padding:5px 0; border-bottom:1px dashed var(--border); }
+.ai-summary-list li:last-child { border-bottom:none; }
+.ai-summary-label { color:var(--sub); flex:0 0 auto; }
+.ai-summary-value { color:var(--text); font-weight:bold; text-align:right; }
+.ai-summary-confirm-btn { margin-top:4px; }
 
 .sample-btns { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
 .btn-sample { background: #edf2f7; border: 1px solid #cbd5e0; padding: 8px 13px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; color: #4a5568; min-height: 36px; }

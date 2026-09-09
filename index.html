@@ -22,15 +22,26 @@
   <div class="topbar">
     <h1>外壁塗装・防水工事 見積もり適正診断</h1>
     <p>むずかしい専門知識がなくても、見積書が適正かその場でチェック</p>
+    <div class="topbar-pitch">
+      <h2>その見積もり、本当に大丈夫？</h2>
+      <p>外壁塗装・屋根塗装・防水工事の見積書を、専門知識がなくても簡単にチェックできます。</p>
+    </div>
   </div>
 
   <main>
     <section id="tab-diagnose" class="tab-panel active">
 
       <div class="intro">
-        <b>使い方はかんたん3ステップ</b>：①お手元の見積書の写真・PDFを送る（または金額などを直接入力）→ ②工事の内容を選ぶ → ③「診断する」を押すだけ。<br>
+        <b>無料・かんたん3ステップ</b>
+        <div class="steps-row">
+          <div class="step-chip"><span class="step-num">1</span>見積書を撮影・PDFアップロード</div>
+          <div class="step-chip"><span class="step-num">2</span>内容を確認</div>
+          <div class="step-chip"><span class="step-num">3</span>診断する</div>
+        </div>
         専門用語には <b>やさしい説明</b> をつけていますので、初めての方でも安心してご利用いただけます。
       </div>
+
+      <button type="button" class="btn-primary hero-cta-btn" id="cta-check-btn">📄 見積書をチェックする</button>
 
       <div id="shared-notice" class="shared-notice" style="display:none;">🔗 共有された診断結果を表示しています。ご自身の見積書でも診断してみましょう。</div>
 
@@ -136,6 +147,21 @@
               <option value="fluorine">フッ素（高耐久グレード）</option>
               <option value="inorganic">無機（最高耐久グレード）</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label>塗料メーカー（分かれば入力・任意）</label>
+            <input type="text" id="paint-manufacturer" list="manufacturer-list" placeholder="例）日本ペイント">
+            <datalist id="manufacturer-list">
+              <option value="日本ペイント"><option value="関西ペイント"><option value="エスケー化研">
+              <option value="アステックペイント"><option value="プレマテックス"><option value="日進産業">
+              <option value="大日本塗料"><option value="水谷ペイント"><option value="菊水化学工業">
+              <option value="アトミクス"><option value="トウペ"><option value="中国塗料">
+              <option value="ロックペイント"><option value="四国化成">
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label>商品名（分かれば入力・任意）</label>
+            <input type="text" id="paint-product" placeholder="例）パーフェクトトップ">
           </div>
           <div class="form-group">
             <label>防水工事の工法（バルコニー防水・屋上防水を選んだ場合）<span id="method-auto" class="auto-tag" style="display:none;">AIが検出</span></label>
