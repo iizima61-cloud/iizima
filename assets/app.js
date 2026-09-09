@@ -1004,6 +1004,9 @@ function setupLeadCard(diagnosis) {
       statusEl.innerText = '✅ 送信しました。担当者よりご連絡いたします。';
       statusEl.classList.add('show');
       form.reset();
+      if (typeof gtag === 'function') {
+        gtag('event', 'conversion', {'send_to': 'AW-18391141487/3zPyCIOl0vEcEO-YysFE'});
+      }
     } catch (err) {
       console.error(err);
       alert('送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。');
