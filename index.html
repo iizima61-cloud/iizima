@@ -32,6 +32,8 @@
         専門用語には <b>やさしい説明</b> をつけていますので、初めての方でも安心してご利用いただけます。
       </div>
 
+      <div id="shared-notice" class="shared-notice" style="display:none;">🔗 共有された診断結果を表示しています。ご自身の見積書でも診断してみましょう。</div>
+
       <div class="sample-btns">
         <button class="btn-sample" onclick="loadSample('danger')">サンプル①：あやしい見積り</button>
         <button class="btn-sample" onclick="loadSample('cheap')">サンプル②：安すぎる見積り</button>
@@ -198,6 +200,10 @@
 
         <div id="result-file-info" class="selected-file-info result-file-info"></div>
 
+        <div class="card" id="share-card" style="text-align:center;">
+          <button type="button" class="btn-copy" id="share-result-btn" style="width:100%;" onclick="shareResult()">🔗 この診断結果をURLで共有する</button>
+        </div>
+
         <div class="card" id="subscore-card">
           <h2>📊 5項目でみる診断結果</h2>
           <div id="subscore-list" class="subscore-list"></div>
@@ -295,11 +301,92 @@
         <div id="history-list"></div>
       </div>
     </section>
+
+    <section id="tab-compare" class="tab-panel">
+      <div class="card">
+        <h2>📊 3社見積もり比較</h2>
+        <div class="hint">最大3社分の見積書をアップロード（または文章を貼り付け）すると、内容の違いを一覧で比較できます。単体の診断とは別の機能で、こちらの結果が単体診断に影響することはありません。</div>
+      </div>
+
+      <div class="card compare-slot">
+        <h2><span class="step-num">1</span> 1社目の見積書</h2>
+        <div class="mini-drop-zone" id="compare-drop-1">
+          <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
+          <p>またはタップしてファイルを選択（写真 / PDF）</p>
+          <input type="file" id="compare-file-1" class="compare-file-input" accept="image/*,application/pdf">
+        </div>
+        <div class="selected-file-info" id="compare-file-info-1">
+          <img id="compare-file-thumb-1" alt="" onclick="openImagePreview(this.src)">
+          <span class="name" id="compare-file-name-1"></span>
+          <button type="button" class="clear-btn" onclick="clearCompareFile(1)" aria-label="選択を解除">✕</button>
+        </div>
+        <div id="compare-status-1" class="compare-scan-status"></div>
+        <div id="compare-progress-1" class="compare-scan-progress"><div id="compare-progress-bar-1" class="compare-scan-progress-bar"></div></div>
+        <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
+        <textarea id="compare-paste-1" class="compare-paste" placeholder="見積書の文字をここに貼り付けてください"></textarea>
+        <button type="button" class="btn-sample" style="margin-top:8px;" onclick="analyzeComparePastedText(1)">この文章を解析する</button>
+      </div>
+
+      <div class="card compare-slot">
+        <h2><span class="step-num">2</span> 2社目の見積書</h2>
+        <div class="mini-drop-zone" id="compare-drop-2">
+          <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
+          <p>またはタップしてファイルを選択（写真 / PDF）</p>
+          <input type="file" id="compare-file-2" class="compare-file-input" accept="image/*,application/pdf">
+        </div>
+        <div class="selected-file-info" id="compare-file-info-2">
+          <img id="compare-file-thumb-2" alt="" onclick="openImagePreview(this.src)">
+          <span class="name" id="compare-file-name-2"></span>
+          <button type="button" class="clear-btn" onclick="clearCompareFile(2)" aria-label="選択を解除">✕</button>
+        </div>
+        <div id="compare-status-2" class="compare-scan-status"></div>
+        <div id="compare-progress-2" class="compare-scan-progress"><div id="compare-progress-bar-2" class="compare-scan-progress-bar"></div></div>
+        <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
+        <textarea id="compare-paste-2" class="compare-paste" placeholder="見積書の文字をここに貼り付けてください"></textarea>
+        <button type="button" class="btn-sample" style="margin-top:8px;" onclick="analyzeComparePastedText(2)">この文章を解析する</button>
+      </div>
+
+      <div class="card compare-slot">
+        <h2><span class="step-num">3</span> 3社目の見積書</h2>
+        <div class="mini-drop-zone" id="compare-drop-3">
+          <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
+          <p>またはタップしてファイルを選択（写真 / PDF）</p>
+          <input type="file" id="compare-file-3" class="compare-file-input" accept="image/*,application/pdf">
+        </div>
+        <div class="selected-file-info" id="compare-file-info-3">
+          <img id="compare-file-thumb-3" alt="" onclick="openImagePreview(this.src)">
+          <span class="name" id="compare-file-name-3"></span>
+          <button type="button" class="clear-btn" onclick="clearCompareFile(3)" aria-label="選択を解除">✕</button>
+        </div>
+        <div id="compare-status-3" class="compare-scan-status"></div>
+        <div id="compare-progress-3" class="compare-scan-progress"><div id="compare-progress-bar-3" class="compare-scan-progress-bar"></div></div>
+        <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
+        <textarea id="compare-paste-3" class="compare-paste" placeholder="見積書の文字をここに貼り付けてください"></textarea>
+        <button type="button" class="btn-sample" style="margin-top:8px;" onclick="analyzeComparePastedText(3)">この文章を解析する</button>
+      </div>
+
+      <div class="sticky-cta">
+        <button type="button" class="btn-submit" id="compare-run-btn">この内容で比較する</button>
+      </div>
+
+      <div id="compare-result-area" style="display:none;">
+        <div class="card">
+          <h2>📊 比較結果</h2>
+          <div class="table-scroll"><div id="compare-table-wrap"></div></div>
+          <p class="compare-disclaimer">価格だけではなく、施工内容・材料・保証などを含めてご検討ください。</p>
+        </div>
+      </div>
+
+      <footer class="note">
+        ※本比較は各社の見積書から自動で読み取った内容をもとにしています。読み取り漏れ・誤読の可能性があるため、最終的な判断の際は必ず原本をご確認ください。特定の1社を「おすすめ」として推薦するものではありません。
+      </footer>
+    </section>
   </main>
 
   <nav class="bottom-nav">
     <button class="nav-btn active" data-tab="diagnose"><span class="ico">🔍</span>診断する</button>
     <button class="nav-btn" data-tab="history"><span class="ico">📋</span>診断履歴</button>
+    <button class="nav-btn" data-tab="compare"><span class="ico">📊</span>3社比較</button>
   </nav>
 
   <div class="modal-overlay" id="modal-overlay">
