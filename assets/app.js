@@ -552,11 +552,25 @@ function analyzeText(text) {
   return result;
 }
 
+// 3社比較専用：「135万円」「98.5万円」のような“万円単位”の表記を金額として認識する。
+// 既存のanalyzeTextは「1,350,000円」のような円単位の表記を前提にしており、
+// 単体診断側の挙動には影響を与えたくないため、この関数は比較機能（analyzeForCompare）
+// からのみ呼び出す、独立した関数として実装している。
+function extractManEnPrice(text) {
+  let m = text.match(/(?:お見積金額|御見積金額|見積金額|御見積合計|見積合計|合計金額|ご請求金額|総額|合計|税込)[^0-9]{0,10}([0-9]+(?:\.[0-9]+)?)\s*万円/);
+  if (!m) m = text.match(/([0-9]+(?:\.[0-9]+)?)\s*万円/);
+  return m ? parseFloat(m[1]) : null;
+}
+
 /* ---- フェーズ3: 3社比較用のテキスト解析（既存のanalyzeTextを流用し、比較に必要な項目だけ追加で判定する） ----
    analyzeTextはDOMを一切書き換えない純粋な関数なので、単体診断とは別に何度呼び出しても
    既存の診断結果には影響しない。 */
 function analyzeForCompare(text) {
   const base = analyzeText(text);
+
+  // 「135万円」のような万円単位の表記は、既存のanalyzeText（円単位の表記が前提）では
+  // 読み取れないため、比較機能側だけのフォールバックとして万円表記も試す。
+  const totalPriceMan = base.totalPriceMan !== null ? base.totalPriceMan : extractManEnPrice(text);
 
   const hasSealing = SEALING_KEYWORDS.some(k => text.includes(k));
   const hasSubstrate = SUBSTRATE_KEYWORDS.some(k => text.includes(k));
@@ -577,7 +591,7 @@ function analyzeForCompare(text) {
   }
 
   return {
-    totalPriceMan: base.totalPriceMan,
+    totalPriceMan,
     areaWall: base.areaWall, areaRoof: base.areaRoof, areaBalcony: base.areaBalcony, areaRooftop: base.areaRooftop, areaSqm: base.areaSqm,
     grade: base.grade, manufacturers: base.manufacturers, waterproofMethod: base.waterproofMethod,
     hasSealing, hasSubstrate, hasAttachedWork, hasWaterproofWork, scaffold, warranty
