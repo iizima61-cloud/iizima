@@ -68,6 +68,9 @@ const WATERPROOF_METHOD_GRADE_KEYWORDS = [
 const SCAFFOLD_KEYWORDS = ["足場"];
 const WARRANTY_KEYWORDS = ["保証書","保証期間","瑕疵保証","アフター保証"];
 
+const GRADE_LABELS = { urethane: 'ウレタン', silicon: 'シリコン', radical: 'ラジカル制御', fluorine: 'フッ素', inorganic: '無機' };
+const WATERPROOF_METHOD_LABELS = { urethane: 'ウレタン防水', frp: 'FRP防水', sheet: '塩ビシート防水' };
+
 /* ==================== タブ切り替え ==================== */
 function initTabs() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -579,7 +582,7 @@ function applyExtractedData(d) {
   if (d.grade) {
     document.getElementById('paint-grade').value = d.grade;
     document.getElementById('grade-auto').style.display = 'inline-block';
-    const gradeName = {urethane:'ウレタン', silicon:'シリコン', radical:'ラジカル制御', fluorine:'フッ素', inorganic:'無機'}[d.grade];
+    const gradeName = GRADE_LABELS[d.grade];
     reportLines.push(`🎨 塗料のグレードとして <b>「${gradeName}」</b> という記載を見つけました。グレードによって適正相場が変わるため、自動で反映しています。`);
   } else {
     document.getElementById('grade-auto').style.display = 'none';
@@ -588,7 +591,7 @@ function applyExtractedData(d) {
   if (d.waterproofMethod) {
     document.getElementById('waterproof-method').value = d.waterproofMethod;
     document.getElementById('method-auto').style.display = 'inline-block';
-    const methodName = {urethane:'ウレタン防水', frp:'FRP防水', sheet:'塩ビシート防水'}[d.waterproofMethod];
+    const methodName = WATERPROOF_METHOD_LABELS[d.waterproofMethod];
     reportLines.push(`🧴 防水工法として <b>「${methodName}」</b> という記載を見つけました。工法によって適正相場が変わるため、自動で反映しています。`);
   } else {
     document.getElementById('method-auto').style.display = 'none';
@@ -631,6 +634,10 @@ function applyExtractedData(d) {
   reportBox.innerHTML = `<h3>🤖 AI読み取りレポート</h3><ul>${reportLines.map(l => `<li>${l}</li>`).join('')}</ul><p style="margin:8px 0 0;color:#a0733a;font-size:11px;">※文字認識には誤読の可能性があります。診断前に必ず内容をご確認・修正ください。</p>`;
   reportBox.style.display = 'block';
   reportBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // 「この診断になった理由」表示で、AIが実際に読み取れた項目/読み取れなかった項目を
+  // 区別して示すために保持しておく（推測値を読み取り結果として扱わないため）。
+  lastExtraction = d;
 }
 
 /* ==================== 診断ロジック ==================== */
@@ -639,7 +646,172 @@ function getPaintRateRange(grade) {
   return base;
 }
 
+/* ---- フェーズ1: 総合点の意味・価格判定・5項目評価・確認ポイント ---- */
+function getScoreMeaning(score) {
+  if (score >= 85) return 'とても良い内容です。安心して検討を進められます。';
+  if (score >= 70) return '大きな問題は見当たりませんが、いくつか確認しておきたい項目があります。';
+  if (score >= 55) return '気になる点がいくつかあります。契約前に業者へしっかり確認しましょう。';
+  if (score >= 40) return '不透明な点が目立ちます。慎重な確認をおすすめします。';
+  return 'リスクが高い内容です。契約を急がず、他社にも相見積もりを取りましょう。';
+}
+
+// 価格判定を5段階（🟢おおむね妥当 / 🟡やや高め / 🟡やや安め / 🔴安すぎる可能性 / ⚪判断材料不足）で返す。
+function getPriceJudgement(price, expectedMinMan, expectedMaxMan) {
+  if (!(expectedMinMan > 0)) {
+    return { icon: '⚪', label: '判断材料不足', tone: 'neutral' };
+  }
+  if (price < expectedMinMan * 0.75) return { icon: '🔴', label: '安すぎる可能性', tone: 'danger' };
+  if (price < expectedMinMan) return { icon: '🟡', label: 'やや安め', tone: 'warn' };
+  if (price <= expectedMaxMan * 1.15) return { icon: '🟢', label: 'おおむね妥当', tone: 'good' };
+  return { icon: '🟡', label: 'やや高め', tone: 'warn' };
+}
+
+// 「安すぎる」場合に確認したいポイント
+const CHEAP_CHECK_POINTS = [
+  '施工範囲（面積）が正しく計測されているか',
+  '下塗り・中塗り・上塗りなど、工程が省略されていないか',
+  'シーリング（コーキング）工事が含まれているか',
+  '付帯部（破風板・雨樋など）の塗装が別料金になっていないか',
+  '足場代が別途請求になっていないか',
+  '記載されている塗料・防水材のグレードが、実際に使われるものと合っているか'
+];
+// 「高い」場合に考えられる理由の候補
+const EXPENSIVE_REASON_POINTS = [
+  '施工面積が実際より大きく計上されている可能性',
+  '高耐久グレードの塗料・工法が使われる前提になっている可能性',
+  '下地処理（補修・ケレンなど）の費用が多めに含まれている可能性',
+  'シーリング工事の範囲が広く設定されている可能性',
+  '防水工事が別途含まれている可能性',
+  '付帯部塗装の項目が多く含まれている可能性'
+];
+
+// 総合点を5項目（価格・透明性・施工内容・材料塗料・注意事項）に分解する。
+// 既存のscore計算で使っている判定材料（isIsshiki等）をそのまま流用する。
+function computeSubScores(ctx) {
+  const { priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod } = ctx;
+  const clamp = v => Math.max(0, Math.min(100, v));
+
+  const priceScoreMap = { good: 95, warn: 65, danger: 35, neutral: null };
+  const priceScore = priceScoreMap[priceJudgement.tone];
+
+  const transparencyScore = clamp(100 - (isIsshiki ? 40 : 0));
+
+  let workScore = 100;
+  if (paintActive && isNoRepair) workScore -= 35;
+  if (waterActive && isNoDrain) workScore -= 30;
+  workScore = clamp(workScore);
+
+  let materialScore = 100;
+  if (paintActive && isNoPaintName) materialScore -= 40;
+  if (waterActive && waterproofMethod === 'unknown') materialScore -= 20;
+  materialScore = clamp(materialScore);
+
+  let cautionScore = 100;
+  if (isPushy) cautionScore -= 50;
+  if (discount >= 10) cautionScore -= 30;
+  cautionScore = clamp(cautionScore);
+
+  return [
+    { key: 'price', label: '① 価格', score: priceScore,
+      desc: priceScore === null ? '面積・工事内容の入力が不足しており判断できません。' : `適正相場と比べて「${priceJudgement.label}」です。` },
+    { key: 'transparency', label: '② 見積書の透明性', score: transparencyScore,
+      desc: isIsshiki ? '「一式」表記が多く、内訳が分かりにくい状態です。' : '数量や内訳がある程度明確に書かれています。' },
+    { key: 'work', label: '③ 施工内容', score: workScore,
+      desc: workScore < 100 ? '下地処理や改修ドレンなど、必要な工程の記載が一部見当たりません。' : '必要な工程がひととおり記載されています。' },
+    { key: 'material', label: '④ 材料・塗料', score: materialScore,
+      desc: materialScore < 100 ? '塗料メーカー名や防水工法など、材料に関する記載が不明確です。' : '使用する材料・工法の情報が明確です。' },
+    { key: 'caution', label: '⑤ 注意事項', score: cautionScore,
+      desc: cautionScore < 100 ? '値引きや契約を急がせる表現など、注意したい記載があります。' : '契約を急がせるような不審な記載はありません。' }
+  ];
+}
+
+function subscoreTone(score) {
+  if (score === null) return 'neutral';
+  if (score >= 80) return 'good';
+  if (score >= 55) return 'warn';
+  return 'danger';
+}
+
+// AIが実際に読み取れた項目／読み取れなかった項目を明示する
+// （読み取れなかった場合に、推測値を「読み取れた事実」として見せないため）。
+function buildReasonList(ctx) {
+  const { wallOn, roofOn, balconyOn, rooftopOn, paintActive, waterActive } = ctx;
+  const lines = [];
+  const ext = lastExtraction;
+
+  if (!ext) {
+    lines.push('ℹ️ 見積書の自動読み取りは行っていません。フォームに入力された内容をもとに診断しています。');
+    return lines;
+  }
+
+  lines.push(ext.totalPriceMan
+    ? `✅ 見積書から総額（約${ext.totalPriceMan}万円）が読み取れました。`
+    : '❔ 総額は見積書から読み取れませんでした（不明）。入力された金額をもとに診断しています。');
+
+  if (wallOn) {
+    lines.push(ext.areaWall
+      ? `✅ 外壁の施工面積（約${ext.areaWall}㎡）が読み取れました。`
+      : '❔ 外壁の施工面積は読み取れませんでした（不明）。');
+  }
+  if (roofOn) {
+    lines.push(ext.areaRoof
+      ? `✅ 屋根の施工面積（約${ext.areaRoof}㎡）が読み取れました。`
+      : '❔ 屋根の施工面積は読み取れませんでした（不明）。');
+  }
+  if (balconyOn) {
+    lines.push(ext.areaBalcony
+      ? `✅ バルコニーの施工面積（約${ext.areaBalcony}㎡）が読み取れました。`
+      : '❔ バルコニーの施工面積は読み取れませんでした（不明）。');
+  }
+  if (rooftopOn) {
+    lines.push(ext.areaRooftop
+      ? `✅ 屋上の施工面積（約${ext.areaRooftop}㎡）が読み取れました。`
+      : '❔ 屋上の施工面積は読み取れませんでした（不明）。');
+  }
+
+  if (paintActive) {
+    lines.push(ext.grade
+      ? `✅ 塗料のグレード（${GRADE_LABELS[ext.grade]}）の記載が見つかりました。`
+      : '❔ 塗料のグレードは記載が見当たらず不明です。');
+    lines.push((ext.manufacturers && ext.manufacturers.length)
+      ? `✅ 塗料メーカー・商品名（${ext.manufacturers.join('・')}）の記載が見つかりました。`
+      : '❔ 塗料のメーカー名・正式な商品名は記載されておらず不明です。');
+    lines.push(ext.hasRepairKeywords
+      ? '✅ 下地補修・シーリングに関する記載が見つかりました。'
+      : '❔ 下地補修・シーリングに関する記載が見当たりません。');
+  }
+
+  if (waterActive) {
+    lines.push(ext.waterproofMethod
+      ? `✅ 防水工法（${WATERPROOF_METHOD_LABELS[ext.waterproofMethod]}）の記載が見つかりました。`
+      : '❔ 防水工法は記載が見当たらず不明です。');
+    lines.push(ext.hasDrainKeyword
+      ? '✅ 改修ドレンに関する記載が見つかりました。'
+      : '❔ 改修ドレンに関する記載が見当たりません。');
+  }
+
+  lines.push(ext.hasScaffold
+    ? '✅ 足場に関する記載が見つかりました。'
+    : '❔ 足場に関する記載が見当たりません。');
+
+  return lines;
+}
+
+// issues（検出されたポイント）の中から優先度の高いものを最大3つ選ぶ。
+function buildChecklist(issuesList) {
+  const priority = { danger: 0, warn: 1, good: 2 };
+  const sorted = issuesList
+    .filter(i => i.level !== 'good')
+    .sort((a, b) => priority[a.level] - priority[b.level]);
+  const top3 = sorted.slice(0, 3);
+  if (!top3.length) {
+    return ['特に急いで確認すべき懸念点は見つかりませんでした。念のため保証内容や工程表を確認しておくと安心です。'];
+  }
+  return top3.map(i => `${i.level === 'danger' ? '🔴' : '🟡'} ${i.title}`);
+}
+
 let lastDiagnosis = null; // 直近の診断結果（履歴保存・相談送信に使う）
+let lastExtraction = null; // 直近のAI読み取り結果（「この診断になった理由」表示に使う）
 
 function calculateDiagnostic(e) {
   e.preventDefault();
@@ -689,12 +861,17 @@ function calculateDiagnostic(e) {
   const qGeneral = [], qPaint = [], qWater = [];
 
   // ---- 価格診断 ----
+  const priceJudgement = getPriceJudgement(price, expectedMinMan, expectedMaxMan);
   if (expectedMinMan > 0) {
-    if (price < expectedMinMan * 0.75) {
+    if (priceJudgement.tone === 'danger') {
       score -= 25;
       issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり安い金額です（手抜き・工程省略のリスク）', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それを大きく下回っています。下地処理や塗装の回数、必要な部材が省かれている可能性があります。` });
       qGeneral.push('・相場より大変お手頃なお見積りですが、その分どこかの工程を簡略化されているのでしょうか？下地処理や塗り回数など、含まれる工程を具体的に教えてください。');
-    } else if (price > expectedMaxMan * 1.3) {
+    } else if (priceJudgement.label === 'やや安め') {
+      score -= 10;
+      issues.push({ level: 'warn', tag: '価格', title: '相場よりやや安めの金額です', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それよりやや低い水準です。工程の一部が簡略化されている可能性もあるため、内容を確認しておくと安心です。` });
+      qGeneral.push('・相場よりやや控えめな金額に見えますが、含まれる工程やグレードについて念のため教えてください。');
+    } else if (priceJudgement.label === 'やや高め') {
       score -= 15;
       issues.push({ level: 'warn', tag: '価格', title: '相場よりやや高めの金額です', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それより高めの水準です。中間業者を挟んでいる場合や、諸経費が多めに計上されている可能性があります。` });
       qGeneral.push('・相場と比較してやや高めに感じましたが、金額の内訳（諸経費や仮設費など）を詳しく教えていただけますか？');
@@ -752,6 +929,7 @@ function calculateDiagnostic(e) {
   scoreBadge.innerText = score + '点';
   gaugeMarker.style.left = score + '%';
   resultArea.style.display = 'block';
+  document.getElementById('score-meaning').textContent = `${score}点 - ${getScoreMeaning(score)}`;
 
   let persona = '', level = '';
   if (score >= 80) {
@@ -789,6 +967,45 @@ function calculateDiagnostic(e) {
   `).join('') || '<p style="font-size:13px;color:#718096;">特筆すべき懸念点は見つかりませんでした。</p>';
 
   document.getElementById('ai-explain').innerHTML = `<p><span class="persona">AI診断士：</span>${persona}</p>`;
+
+  /* ---- フェーズ1: 5項目評価 ---- */
+  const subScores = computeSubScores({ priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod });
+  document.getElementById('subscore-list').innerHTML = subScores.map(s => {
+    const tone = subscoreTone(s.score);
+    const valueText = s.score === null ? '判断材料不足' : s.score + '点';
+    const barWidth = s.score === null ? 0 : s.score;
+    return `
+      <div class="subscore-item">
+        <div class="subscore-head"><span>${s.label}</span><span class="subscore-value ${tone}">${valueText}</span></div>
+        <div class="subscore-bar"><div class="subscore-bar-fill ${tone}" style="width:${barWidth}%;"></div></div>
+        <div class="subscore-desc">${s.desc}</div>
+      </div>`;
+  }).join('');
+
+  /* ---- フェーズ1: 価格判定（5段階）と確認ポイント ---- */
+  document.getElementById('price-judgement-badge').textContent = `${priceJudgement.icon} ${priceJudgement.label}`;
+  const pricePointsHint = document.getElementById('price-judgement-hint');
+  const pricePointsEl = document.getElementById('price-judgement-points');
+  if (priceJudgement.tone === 'danger') {
+    pricePointsHint.textContent = '確認ポイント：';
+    pricePointsHint.style.display = 'block';
+    pricePointsEl.innerHTML = CHEAP_CHECK_POINTS.map(p => `<li>${p}</li>`).join('');
+  } else if (priceJudgement.label === 'やや高め') {
+    pricePointsHint.textContent = '高くなっている理由の候補：';
+    pricePointsHint.style.display = 'block';
+    pricePointsEl.innerHTML = EXPENSIVE_REASON_POINTS.map(p => `<li>${p}</li>`).join('');
+  } else {
+    pricePointsHint.style.display = 'none';
+    pricePointsEl.innerHTML = '';
+  }
+
+  /* ---- フェーズ1: この診断になった理由 ---- */
+  const reasonLines = buildReasonList({ wallOn, roofOn, balconyOn, rooftopOn, paintActive, waterActive });
+  document.getElementById('reason-list').innerHTML = reasonLines.map(l => `<li>${l}</li>`).join('');
+
+  /* ---- フェーズ1: 確認した方がいいポイント（最大3つ） ---- */
+  const checklistLines = buildChecklist(issues);
+  document.getElementById('checklist-list').innerHTML = checklistLines.map(l => `<li>${l}</li>`).join('');
 
   /* ---- 確認フレーズ ---- */
   const container = document.getElementById('template-container');
