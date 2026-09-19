@@ -1646,13 +1646,24 @@ function setupLeadCard(diagnosis) {
   const statusEl = document.getElementById('lead-status');
   statusEl.classList.remove('show');
   statusEl.innerText = '';
+  // 送信前チェック・送信失敗時のメッセージは alert() を使わず、既存の
+  // #lead-status 欄にテキストで表示する（フリーズ調査への対応：スマホで
+  // 名前・連絡先などの入力直後に同期的な alert() を呼ぶと、仮想キーボードが
+  // 閉じるタイミングと重なって画面が反応しなくなったように見える端末があるため、
+  // 3社比較機能で行った修正と同じ非モーダルな表示方法に統一する）。
+  function showLeadMessage(text, isError) {
+    statusEl.style.color = isError ? 'var(--danger)' : '';
+    statusEl.innerText = text;
+    statusEl.classList.add('show');
+  }
+
   form.onsubmit = async (e) => {
     e.preventDefault();
     const consent = document.getElementById('lead-consent').checked;
-    if (!consent) { alert('送信には同意チェックが必要です。'); return; }
+    if (!consent) { showLeadMessage('⚠️ 送信には同意チェックが必要です。', true); return; }
     const name = document.getElementById('lead-name').value.trim();
     const contact = document.getElementById('lead-contact').value.trim();
-    if (!name || !contact) { alert('お名前と、電話番号かメールアドレスのいずれかをご入力ください。'); return; }
+    if (!name || !contact) { showLeadMessage('⚠️ お名前と、電話番号かメールアドレスのいずれかをご入力ください。', true); return; }
     const memo = document.getElementById('lead-memo').value.trim();
     const topics = Array.from(document.querySelectorAll('.lead-topic:checked')).map(cb => cb.value);
 
@@ -1679,15 +1690,14 @@ function setupLeadCard(diagnosis) {
           timestamp: new Date(diagnosis.timestamp).toISOString()
         })
       });
-      statusEl.innerText = '✅ 送信しました。担当者よりご連絡いたします。';
-      statusEl.classList.add('show');
+      showLeadMessage('✅ 送信しました。担当者よりご連絡いたします。', false);
       form.reset();
       if (typeof gtag === 'function') {
         gtag('event', 'conversion', {'send_to': 'AW-18391141487/3zPyCIOl0vEcEO-YysFE'});
       }
     } catch (err) {
       console.error(err);
-      alert('送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。');
+      showLeadMessage('⚠️ 送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。', true);
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerText = 'この内容で相談する';
