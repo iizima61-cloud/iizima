@@ -96,6 +96,7 @@ function onScopeChange() {
   toggle('chk-roof', 'area-roof-wrap');
   toggle('chk-balcony', 'area-balcony-wrap');
   toggle('chk-rooftop', 'area-rooftop-wrap');
+  toggle('chk-roof', 'roof-paint-wrap');
 
   const paintActive = document.getElementById('chk-wall').checked || document.getElementById('chk-roof').checked;
   const waterActive = document.getElementById('chk-balcony').checked || document.getElementById('chk-rooftop').checked;
@@ -157,6 +158,8 @@ function loadSample(type) {
   document.getElementById('ai-report').style.display = 'none';
   document.getElementById('paint-manufacturer').value = '';
   document.getElementById('paint-product').value = '';
+  document.getElementById('roof-paint-manufacturer').value = '';
+  document.getElementById('roof-paint-product').value = '';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -283,8 +286,9 @@ async function handleFile(file) {
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000));
     const text = await Promise.race([extractPromise, timeoutPromise]);
     setScanStatus('内容を解析しています…', 95);
-    const data = analyzeText(normalizeText(text));
-    applyExtractedData(data);
+    const normalized = normalizeText(text);
+    const data = analyzeText(normalized);
+    applyExtractedData(data, extractRoofPaintInfo(normalized));
     setScanStatus(null);
   } catch (err) {
     console.error(err);
@@ -435,8 +439,9 @@ function scrollToDiagForm() {
 function analyzePastedText() {
   const raw = document.getElementById('paste-text').value;
   if (!raw.trim()) { alert('文章を貼り付けてください。'); return; }
-  const data = analyzeText(normalizeText(raw));
-  applyExtractedData(data);
+  const normalized = normalizeText(raw);
+  const data = analyzeText(normalized);
+  applyExtractedData(data, extractRoofPaintInfo(normalized));
 }
 
 /* ==================== テキスト正規化・抽出ロジック ==================== */
@@ -616,7 +621,35 @@ function analyzeForCompare(text) {
   };
 }
 
-function applyExtractedData(d) {
+// 屋根塗装用のメーカー・商品名欄を追加するための独立した抽出処理。
+// analyzeText本体は一切変更せず、同じ正規化済みテキストに対して別途この関数を呼び出す。
+// 「屋根」に関するキーワードの直後（50文字以内）に見つかった場合だけ、屋根用の
+// メーカー・商品名として扱う。見つからない、区別できない場合はnullを返し、
+// 無理に自動入力しない（ユーザーの手入力に任せる）。
+function extractNearKeyword(text, contextKeywords, candidateList, windowSize) {
+  for (const kw of contextKeywords) {
+    let searchFrom = 0;
+    while (true) {
+      const idx = text.indexOf(kw, searchFrom);
+      if (idx === -1) break;
+      const window = text.slice(idx, idx + windowSize);
+      const found = candidateList.find(c => window.includes(c));
+      if (found) return found;
+      searchFrom = idx + kw.length;
+    }
+  }
+  return null;
+}
+
+function extractRoofPaintInfo(text) {
+  return {
+    roofManufacturerOnly: extractNearKeyword(text, ROOF_KEYWORDS, MANUFACTURER_KEYWORDS, 50),
+    roofProductOnly: extractNearKeyword(text, ROOF_KEYWORDS, PAINT_PRODUCT_KEYWORDS, 50)
+  };
+}
+
+function applyExtractedData(d, roofInfo) {
+  roofInfo = roofInfo || {};
   const reportLines = [];
 
   if (d.totalPriceMan) {
@@ -682,6 +715,10 @@ function applyExtractedData(d) {
   if (d.manufacturerOnly) document.getElementById('paint-manufacturer').value = d.manufacturerOnly;
   if (d.productOnly) document.getElementById('paint-product').value = d.productOnly;
 
+  // ---- 屋根塗装用メーカー・商品名（「屋根」の近くで区別できた場合だけ自動入力） ----
+  if (roofInfo.roofManufacturerOnly) document.getElementById('roof-paint-manufacturer').value = roofInfo.roofManufacturerOnly;
+  if (roofInfo.roofProductOnly) document.getElementById('roof-paint-product').value = roofInfo.roofProductOnly;
+
   document.getElementById('chk-isshiki').checked = d.isshikiCount >= 4;
   if (d.isshikiCount > 0) {
     reportLines.push(`📋 見積書の中に「一式」という言葉が <b>${d.isshikiCount}回</b> 見つかりました。${d.isshikiCount >= 4 ? 'やや多めなので、内訳の開示を求めることをおすすめします。' : 'この程度であれば大きな問題ではないことが多いです。'}`);
@@ -729,10 +766,13 @@ function applyExtractedData(d) {
     ['工事種別', workTypeLabels.length ? workTypeLabels.join('・') : '不明'],
     ['施工面積', areaSummaryParts.length ? areaSummaryParts.join('、') : '不明'],
     ['塗料メーカー', d.manufacturerOnly || '不明'],
-    ['商品名', d.productOnly || '不明'],
-    ['見積金額', priceYenText],
-    ['保証', warrantyText]
+    ['商品名', d.productOnly || '不明']
   ];
+  if (d.hasRoof) {
+    summaryRows.push(['屋根用メーカー', roofInfo.roofManufacturerOnly || '不明']);
+    summaryRows.push(['屋根用商品名', roofInfo.roofProductOnly || '不明']);
+  }
+  summaryRows.push(['見積金額', priceYenText], ['保証', warrantyText]);
   const summaryHtml = `
     <div class="ai-summary-card">
       <h3>🤖 AI読み取り結果</h3>
@@ -1208,6 +1248,12 @@ function calculateDiagnostic(e) {
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
 
+  // ---- 塗料メーカー・商品名（外壁用・屋根用、どちらも任意入力） ----
+  const manufacturer = document.getElementById('paint-manufacturer').value.trim();
+  const product = document.getElementById('paint-product').value.trim();
+  const roofManufacturer = document.getElementById('roof-paint-manufacturer').value.trim();
+  const roofProduct = document.getElementById('roof-paint-product').value.trim();
+
   lastDiagnosis = {
     id: 'd' + Date.now(),
     timestamp: Date.now(),
@@ -1217,6 +1263,7 @@ function calculateDiagnostic(e) {
     expectedMax: expectedMaxMan,
     scopeSummary: scopeParts.join('、'),
     grade,
+    manufacturer, product, roofManufacturer, roofProduct,
     issues: issues.map(i => ({ level: i.level, tag: i.tag, title: i.title })),
     // ---- フェーズ3: 履歴の価格判定・5項目評価の追加表示用 ----
     priceJudgement: { icon: priceJudgement.icon, label: priceJudgement.label, tone: priceJudgement.tone },
@@ -1625,6 +1672,10 @@ function setupLeadCard(diagnosis) {
           expectedMin: diagnosis.expectedMin,
           expectedMax: diagnosis.expectedMax,
           scopeSummary: diagnosis.scopeSummary,
+          manufacturer: diagnosis.manufacturer,
+          product: diagnosis.product,
+          roofManufacturer: diagnosis.roofManufacturer,
+          roofProduct: diagnosis.roofProduct,
           timestamp: new Date(diagnosis.timestamp).toISOString()
         })
       });
