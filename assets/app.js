@@ -154,7 +154,7 @@ function loadSample(type) {
   } else if (type === 'good') {
     document.getElementById('area-wall').value = 125;
     document.getElementById('area-rooftop').value = 40;
-    document.getElementById('total-price').value = 148;
+    document.getElementById('total-price').value = 100;
     document.getElementById('paint-grade').value = 'fluorine';
     document.getElementById('discount-amount').value = 3;
     setChecks(false, false, false, false, false, false);
