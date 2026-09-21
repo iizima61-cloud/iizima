@@ -36,6 +36,11 @@ const WATERPROOF_RATE = {
   unknown:  { min: 4500, max: 9000 }
 };
 
+// 付帯部塗装（破風板・軒天・雨樋・水切りなど）1坪あたりの相場（円）。
+// 各種相場情報では付帯部が外壁塗装費用全体のおよそ15〜30%程度を占めるとされており、
+// そこから逆算した控えめな範囲（1万円〜2万円/坪）を採用する。
+const ATTACHED_RATE_PER_TSUBO = { min: 10000, max: 20000 };
+
 const MANUFACTURER_KEYWORDS = [
   "日本ペイント","関西ペイント","エスケー化研","SK化研","アステックペイント","アステック",
   "プレマテックス","日進産業","ガイナ","大日本塗料","水谷ペイント","水谷","菊水化学工業","菊水化学","キクスイ","アトミクス",
@@ -103,6 +108,7 @@ function onScopeChange() {
 
   setRowEnabled('row-no-paint-name', paintActive);
   setRowEnabled('row-no-repair', paintActive);
+  setRowEnabled('row-no-attached', paintActive);
   setRowEnabled('row-no-drain', waterActive);
 }
 function toggle(chkId, wrapId) {
@@ -137,21 +143,21 @@ function loadSample(type) {
     document.getElementById('total-price').value = 210;
     document.getElementById('paint-grade').value = 'silicon';
     document.getElementById('discount-amount').value = 40;
-    setChecks(true, true, true, true, true);
+    setChecks(true, true, true, true, true, false);
   } else if (type === 'cheap') {
     document.getElementById('area-wall').value = 140;
     document.getElementById('area-rooftop').value = 50;
     document.getElementById('total-price').value = 68;
     document.getElementById('paint-grade').value = 'urethane';
     document.getElementById('discount-amount').value = 0;
-    setChecks(true, false, true, true, false);
+    setChecks(true, false, true, true, false, false);
   } else if (type === 'good') {
     document.getElementById('area-wall').value = 125;
     document.getElementById('area-rooftop').value = 40;
     document.getElementById('total-price').value = 148;
     document.getElementById('paint-grade').value = 'fluorine';
     document.getElementById('discount-amount').value = 3;
-    setChecks(false, false, false, false, false);
+    setChecks(false, false, false, false, false, false);
   }
   onScopeChange();
   onAreaChange();
@@ -161,12 +167,13 @@ function loadSample(type) {
   document.getElementById('roof-paint-manufacturer').value = '';
   document.getElementById('roof-paint-product').value = '';
 }
-function setChecks(isshiki, noPaint, noRepair, noDrain, pushy) {
+function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
   document.getElementById('chk-isshiki').checked = isshiki;
   document.getElementById('chk-no-paint-name').checked = noPaint;
   document.getElementById('chk-no-repair').checked = noRepair;
   document.getElementById('chk-no-drain').checked = noDrain;
   document.getElementById('chk-pushy').checked = pushy;
+  document.getElementById('chk-no-attached').checked = !!noAttached;
 }
 
 /* ==================== ファイル読み込み・OCR ==================== */
@@ -975,6 +982,7 @@ const ISSUE_QUESTION_TEMPLATES = {
   '「一式」表記が多く、内訳が不透明です': '見積書を確認したところ、「一式」という表記が多く、数量ごとの内訳が分かりませんでした。㎡やmごとの内訳を教えてください。',
   '塗料のメーカー名・商品名が不明です': '見積書を確認したところ、使用する塗料のメーカー名・正式な商品名が分かりませんでした。具体的な製品名を教えてください。',
   '下地補修・シーリングの記載がありません': '見積書を確認したところ、シーリング工事や下地補修の施工範囲が分かりませんでした。今回の工事では、どの部分が施工対象になりますか？',
+  '付帯部塗装（破風板・軒天・雨樋・水切りなど）の記載がありません': '見積書を確認したところ、破風板・軒天・雨樋・水切りなど付帯部の塗装についての記載が見当たりませんでした。今回の工事に含まれていますか？',
   '改修ドレン（排水口）の記載がありません': '見積書を確認したところ、改修ドレン（排水口の交換）についての記載が見当たりませんでした。今回の工事に含まれていますか？',
   '大幅な値引きや契約を急がせる表現があります': '見積書を確認したところ、大幅な値引きや契約を急がせるような記載がありました。値引き前の金額の根拠を教えてください。'
 };
@@ -1058,10 +1066,15 @@ function calculateDiagnostic(e) {
   const isIsshiki = document.getElementById('chk-isshiki').checked;
   const isNoPaintName = document.getElementById('chk-no-paint-name').checked && paintActive;
   const isNoRepair = document.getElementById('chk-no-repair').checked && paintActive;
+  const isNoAttached = document.getElementById('chk-no-attached').checked && paintActive;
   const isNoDrain = document.getElementById('chk-no-drain').checked && waterActive;
   const isPushy = document.getElementById('chk-pushy').checked;
 
   // ---- 相場計算（円）----
+  // expectedMin/expectedMaxは、価格判定（🟢🟡🔴の判定・価格スコアの減点）に使う基準値のため、
+  // ここでは既存の計算のまま変更しない（判定基準を変えると、価格以外は変わっていないのに
+  // サンプル①②③の点数がズレてしまうため）。付帯部の目安は別変数（attachedMin/attachedMax）
+  // として保持し、画面に表示する「適正相場の目安」だけに上乗せする。
   const paintRate = getPaintRateRange(grade);
   const waterRate = WATERPROOF_RATE[waterproofMethod] || WATERPROOF_RATE.unknown;
   let expectedMin = 0, expectedMax = 0;
@@ -1072,6 +1085,19 @@ function calculateDiagnostic(e) {
 
   const expectedMinMan = Math.round(expectedMin / 1000) / 10;
   const expectedMaxMan = Math.round(expectedMax / 1000) / 10;
+
+  // 付帯部塗装（破風板・軒天・雨樋・水切りなど）の目安。
+  // 外壁・屋根塗装の施工面積（坪換算）に、付帯部の坪単価目安を掛けて算出する。
+  // 防水のみの場合は付帯部（外壁・屋根塗装に伴うもの）は加算しない。
+  let attachedMin = 0, attachedMax = 0;
+  if (paintActive) {
+    const attachedTsubo = ((wallOn ? areaWall : 0) + (roofOn ? areaRoof : 0)) / SQM_PER_TSUBO;
+    attachedMin = attachedTsubo * ATTACHED_RATE_PER_TSUBO.min;
+    attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
+  }
+  // 表示用の適正相場（付帯部の目安を含む）。価格判定・スコアには使わず、画面表示のみに使う。
+  const displayMinMan = Math.round((expectedMin + attachedMin) / 1000) / 10;
+  const displayMaxMan = Math.round((expectedMax + attachedMax) / 1000) / 10;
 
   let score = 100;
   const issues = [];
@@ -1114,6 +1140,11 @@ function calculateDiagnostic(e) {
     score -= 18;
     issues.push({ level: 'danger', tag: '塗装', title: '下地補修・シーリングの記載がありません', desc: '塗装はいわば「お化粧」で、下地補修はその前段階の「肌のお手入れ」にあたります。ここを省いて上から塗るだけだと、数年でひび割れや剥がれが再発しやすくなります。' });
     qPaint.push('・ひび割れ補修や、目地のシーリング（打ち替え・増し打ち）、鉄部のケレン処理の費用は含まれていますか？');
+  }
+  if (paintActive && isNoAttached) {
+    score -= 12;
+    issues.push({ level: 'warn', tag: '塗装', title: '付帯部塗装（破風板・軒天・雨樋・水切りなど）の記載がありません', desc: '外壁塗装とセットで必要な部分ですが、見積書に記載がないと、後から追加費用として請求されることがあります。' });
+    qPaint.push('・破風板・軒天・雨樋・水切りなど、付帯部の塗装費用は見積もりに含まれていますか？');
   }
 
   // ---- 防水関連 ----
@@ -1181,7 +1212,8 @@ function calculateDiagnostic(e) {
   }
 
   if (expectedMinMan > 0) {
-    priceCompare.innerText = `適正相場の目安：約 ${expectedMinMan}万円 〜 ${expectedMaxMan}万円（今回の入力条件に基づく概算）`;
+    const attachedNote = paintActive ? '、付帯部塗装の目安を含む' : '';
+    priceCompare.innerText = `適正相場の目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（今回の入力条件に基づく概算${attachedNote}）`;
   } else {
     priceCompare.innerText = '';
   }
@@ -1270,8 +1302,8 @@ function calculateDiagnostic(e) {
     timestamp: Date.now(),
     score, level,
     priceMan: price,
-    expectedMin: expectedMinMan,
-    expectedMax: expectedMaxMan,
+    expectedMin: displayMinMan,
+    expectedMax: displayMaxMan,
     scopeSummary: scopeParts.join('、'),
     grade,
     manufacturer, product, roofManufacturer, roofProduct,
@@ -1738,6 +1770,7 @@ function buildShareUrl() {
     isk: document.getElementById('chk-isshiki').checked ? 1 : 0,
     np: document.getElementById('chk-no-paint-name').checked ? 1 : 0,
     nr: document.getElementById('chk-no-repair').checked ? 1 : 0,
+    na: document.getElementById('chk-no-attached').checked ? 1 : 0,
     nd: document.getElementById('chk-no-drain').checked ? 1 : 0,
     ps: document.getElementById('chk-pushy').checked ? 1 : 0
   };
@@ -1793,6 +1826,7 @@ function applySharedStateFromUrl() {
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
     document.getElementById('chk-no-repair').checked = !!state.nr;
+    document.getElementById('chk-no-attached').checked = !!state.na;
     document.getElementById('chk-no-drain').checked = !!state.nd;
     document.getElementById('chk-pushy').checked = !!state.ps;
     return true;
