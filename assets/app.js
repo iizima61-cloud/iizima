@@ -1071,10 +1071,6 @@ function calculateDiagnostic(e) {
   const isPushy = document.getElementById('chk-pushy').checked;
 
   // ---- 相場計算（円）----
-  // expectedMin/expectedMaxは、価格判定（🟢🟡🔴の判定・価格スコアの減点）に使う基準値のため、
-  // ここでは既存の計算のまま変更しない（判定基準を変えると、価格以外は変わっていないのに
-  // サンプル①②③の点数がズレてしまうため）。付帯部の目安は別変数（attachedMin/attachedMax）
-  // として保持し、画面に表示する「適正相場の目安」だけに上乗せする。
   const paintRate = getPaintRateRange(grade);
   const waterRate = WATERPROOF_RATE[waterproofMethod] || WATERPROOF_RATE.unknown;
   let expectedMin = 0, expectedMax = 0;
@@ -1082,9 +1078,6 @@ function calculateDiagnostic(e) {
   if (roofOn) { expectedMin += areaRoof * paintRate.min * ROOF_FACTOR; expectedMax += areaRoof * paintRate.max * ROOF_FACTOR; }
   if (balconyOn) { expectedMin += areaBalcony * waterRate.min; expectedMax += areaBalcony * waterRate.max; }
   if (rooftopOn) { expectedMin += areaRooftop * waterRate.min; expectedMax += areaRooftop * waterRate.max; }
-
-  const expectedMinMan = Math.round(expectedMin / 1000) / 10;
-  const expectedMaxMan = Math.round(expectedMax / 1000) / 10;
 
   // 付帯部塗装（破風板・軒天・雨樋・水切りなど）の目安。
   // 外壁・屋根塗装の施工面積（坪換算）に、付帯部の坪単価目安を掛けて算出する。
@@ -1095,7 +1088,9 @@ function calculateDiagnostic(e) {
     attachedMin = attachedTsubo * ATTACHED_RATE_PER_TSUBO.min;
     attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
   }
-  // 表示用の適正相場（付帯部の目安を含む）。価格判定・スコアには使わず、画面表示のみに使う。
+  // 適正相場（付帯部塗装の目安を含む）。画面表示と、価格判定・スコア計算の両方でこの値を使う。
+  // 表示している金額と判定基準を分けると、表示上は範囲内なのにバッジだけ古い基準のまま、
+  // という矛盾が起きるため、判定にも必ずこの値を使うこと。
   const displayMinMan = Math.round((expectedMin + attachedMin) / 1000) / 10;
   const displayMaxMan = Math.round((expectedMax + attachedMax) / 1000) / 10;
 
@@ -1104,22 +1099,22 @@ function calculateDiagnostic(e) {
   const qGeneral = [], qPaint = [], qWater = [];
 
   // ---- 価格診断 ----
-  const priceJudgement = getPriceJudgement(price, expectedMinMan, expectedMaxMan);
-  if (expectedMinMan > 0 && priceJudgement.tone !== 'neutral') {
+  const priceJudgement = getPriceJudgement(price, displayMinMan, displayMaxMan);
+  if (displayMinMan > 0 && priceJudgement.tone !== 'neutral') {
     if (priceJudgement.tone === 'danger') {
       score -= 25;
-      issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり安い金額です（手抜き・工程省略のリスク）', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それを大きく下回っています。下地処理や塗装の回数、必要な部材が省かれている可能性があります。` });
+      issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり安い金額です（手抜き・工程省略のリスク）', desc: `目安となる適正相場は約${displayMinMan}万円〜${displayMaxMan}万円ですが、それを大きく下回っています。下地処理や塗装の回数、必要な部材が省かれている可能性があります。` });
       qGeneral.push('・相場より大変お手頃なお見積りですが、その分どこかの工程を簡略化されているのでしょうか？下地処理や塗り回数など、含まれる工程を具体的に教えてください。');
     } else if (priceJudgement.label === 'やや安め') {
       score -= 10;
-      issues.push({ level: 'warn', tag: '価格', title: '相場よりやや安めの金額です', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それよりやや低い水準です。工程の一部が簡略化されている可能性もあるため、内容を確認しておくと安心です。` });
+      issues.push({ level: 'warn', tag: '価格', title: '相場よりやや安めの金額です', desc: `目安となる適正相場は約${displayMinMan}万円〜${displayMaxMan}万円ですが、それよりやや低い水準です。工程の一部が簡略化されている可能性もあるため、内容を確認しておくと安心です。` });
       qGeneral.push('・相場よりやや控えめな金額に見えますが、含まれる工程やグレードについて念のため教えてください。');
     } else if (priceJudgement.label === 'やや高め') {
       score -= 15;
-      issues.push({ level: 'warn', tag: '価格', title: '相場よりやや高めの金額です', desc: `目安となる適正相場は約${expectedMinMan}万円〜${expectedMaxMan}万円ですが、それより高めの水準です。中間業者を挟んでいる場合や、諸経費が多めに計上されている可能性があります。` });
+      issues.push({ level: 'warn', tag: '価格', title: '相場よりやや高めの金額です', desc: `目安となる適正相場は約${displayMinMan}万円〜${displayMaxMan}万円ですが、それより高めの水準です。中間業者を挟んでいる場合や、諸経費が多めに計上されている可能性があります。` });
       qGeneral.push('・相場と比較してやや高めに感じましたが、金額の内訳（諸経費や仮設費など）を詳しく教えていただけますか？');
     } else {
-      issues.push({ level: 'good', tag: '価格', title: '金額は相場の範囲内です', desc: `お見積り金額（${price}万円）は、選択された工事内容における適正相場（約${expectedMinMan}万円〜${expectedMaxMan}万円）の範囲に収まっています。` });
+      issues.push({ level: 'good', tag: '価格', title: '金額は相場の範囲内です', desc: `お見積り金額（${price}万円）は、選択された工事内容における適正相場（約${displayMinMan}万円〜${displayMaxMan}万円）の範囲に収まっています。` });
     }
   }
 
@@ -1211,7 +1206,7 @@ function calculateDiagnostic(e) {
     persona = '正直に申し上げると、少し心配な点が多いお見積りです。「安いから」「今すぐ契約しないと損」といった言葉に惑わされず、一度立ち止まって、他の会社にも同じ条件で見積もりを依頼（相見積もり）することを強くおすすめします。工事は一生に何度もあるものではないからこそ、慎重に選びましょう。';
   }
 
-  if (expectedMinMan > 0) {
+  if (displayMinMan > 0) {
     const attachedNote = paintActive ? '、付帯部塗装の目安を含む' : '';
     priceCompare.innerText = `適正相場の目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（今回の入力条件に基づく概算${attachedNote}）`;
   } else {
