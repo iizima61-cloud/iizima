@@ -1148,13 +1148,24 @@ function calculateDiagnostic(e) {
   resultArea.style.display = 'block';
   document.getElementById('score-meaning').textContent = `${score}点 - ${getScoreMeaning(score)}`;
 
+  // 価格判定が「適正」「判断材料不足」以外（やや安め・やや高め・安すぎる等）の場合は、
+  // 総合スコアが80点以上でも「金額ともに大きな問題は見られません」のように金額を
+  // 無条件に肯定する文言は使わない。①価格の内訳表示と総合コメントが矛盾しないようにするための分岐。
+  const priceHasNoConcern = priceJudgement.tone === 'good' || priceJudgement.tone === 'neutral';
+
   let persona = '', level = '';
   if (score >= 80) {
     level = 'good';
     scoreBox.className = 'score-box good';
-    scoreTitle.innerText = '🟢 総合判定：適正（健康優良児タイプ）';
-    scoreDesc.innerText = '記載内容・金額ともに大きな問題は見られません。安心して検討を進めやすい見積もりです。';
-    persona = 'とても良いお見積りですね！内訳もしっかりしていて、金額も相場の範囲内です。人間ドックで例えるなら「健康優良児」タイプ。とはいえ最終決定の前には、必ず他の業者とも比較（相見積もり）することをおすすめします。';
+    if (priceHasNoConcern) {
+      scoreTitle.innerText = '🟢 総合判定：適正（健康優良児タイプ）';
+      scoreDesc.innerText = '記載内容・金額ともに大きな問題は見られません。安心して検討を進めやすい見積もりです。';
+      persona = 'とても良いお見積りですね！内訳もしっかりしていて、金額も相場の範囲内です。人間ドックで例えるなら「健康優良児」タイプ。とはいえ最終決定の前には、必ず他の業者とも比較（相見積もり）することをおすすめします。';
+    } else {
+      scoreTitle.innerText = '🟢 総合判定：概ね適正（価格は要確認）';
+      scoreDesc.innerText = `価格面は少し確認が必要ですが、それ以外の記載内容は良好です。下の「確認フレーズ」を使って金額の内訳を確認しましょう（価格判定：${priceJudgement.icon} ${priceJudgement.label}）。`;
+      persona = '内訳の記載などは概ね良好で、その点は安心材料です。ただし価格については相場と比べて' + priceJudgement.label + 'な水準になっているため、契約前に金額の内訳（諸経費や仮設費など）をしっかり確認することをおすすめします。';
+    }
   } else if (score >= 50) {
     level = 'warn';
     scoreBox.className = 'score-box warn';
