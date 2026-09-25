@@ -29,12 +29,27 @@ const PAINT_RATE = {
 const ROOF_FACTOR = 0.85; // 屋根は外壁よりやや単価が下がる目安
 
 // 防水1㎡あたりの相場（円）。工法によって変動する（バルコニー・屋上共通）。
+// 塩ビシート防水は自社の実勢感覚（300㎡以上を基準とした価格）を採用。
 const WATERPROOF_RATE = {
   urethane: { min: 5000, max: 7500 },  // ウレタン防水（密着・通気緩衝工法など）
   frp:      { min: 6500, max: 9500 },  // FRP防水
   sheet:    { min: 6000, max: 12000 }, // 塩ビシート防水
   unknown:  { min: 4500, max: 9000 }
 };
+
+// 断熱材ありの場合、防水工事の単価を何倍にするか。
+// シーカ社の公式設計価格表（2024年4月版）で、断熱なし12,500〜14,000円/㎡に対し
+// 断熱あり20,000〜23,200円/㎡だったことから、約1.6倍を採用する（工法を問わず共通）。
+const WATERPROOF_INSULATION_MULTIPLIER = 1.6;
+
+// 防水工事の施工面積による割増し倍率（メーカー価格表の面積区分ルールを採用）。
+// 300㎡以上を基準（割増しなし）とし、面積が小さくなるほど坪単価が上がる。
+function getWaterproofAreaSurchargeMultiplier(areaSqm) {
+  if (!(areaSqm > 0)) return 1;
+  if (areaSqm >= 300) return 1;
+  if (areaSqm >= 200) return 1.3;
+  return 1.5; // 200㎡未満（100㎡未満も含む。実際はさらに高くなる傾向がある）
+}
 
 // 付帯部塗装（破風板・軒天・雨樋・水切りなど）1坪あたりの相場（円）。
 // 自社の過去請求書実績（軒天700〜1,500円/㎡、破風板750〜1,300円/m、
@@ -166,6 +181,7 @@ function loadSample(type) {
   document.getElementById('paint-product').value = '';
   document.getElementById('roof-paint-manufacturer').value = '';
   document.getElementById('roof-paint-product').value = '';
+  document.getElementById('waterproof-insulation').value = 'none';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -1072,12 +1088,28 @@ function calculateDiagnostic(e) {
 
   // ---- 相場計算（円）----
   const paintRate = getPaintRateRange(grade);
-  const waterRate = WATERPROOF_RATE[waterproofMethod] || WATERPROOF_RATE.unknown;
+  const waterRateBase = WATERPROOF_RATE[waterproofMethod] || WATERPROOF_RATE.unknown;
+  const insulation = document.getElementById('waterproof-insulation').value;
+  const insulationMultiplier = insulation === 'insulated' ? WATERPROOF_INSULATION_MULTIPLIER : 1;
+  const waterRate = { min: waterRateBase.min * insulationMultiplier, max: waterRateBase.max * insulationMultiplier };
   let expectedMin = 0, expectedMax = 0;
   if (wallOn) { expectedMin += areaWall * paintRate.min; expectedMax += areaWall * paintRate.max; }
   if (roofOn) { expectedMin += areaRoof * paintRate.min * ROOF_FACTOR; expectedMax += areaRoof * paintRate.max * ROOF_FACTOR; }
-  if (balconyOn) { expectedMin += areaBalcony * waterRate.min; expectedMax += areaBalcony * waterRate.max; }
-  if (rooftopOn) { expectedMin += areaRooftop * waterRate.min; expectedMax += areaRooftop * waterRate.max; }
+
+  // 防水工事は施工面積が小さいほど坪単価が上がる（メーカー価格表の面積区分ルールを反映）。
+  let waterproofSurchargeApplied = false;
+  if (balconyOn) {
+    const surcharge = getWaterproofAreaSurchargeMultiplier(areaBalcony);
+    if (surcharge > 1) waterproofSurchargeApplied = true;
+    expectedMin += areaBalcony * waterRate.min * surcharge;
+    expectedMax += areaBalcony * waterRate.max * surcharge;
+  }
+  if (rooftopOn) {
+    const surcharge = getWaterproofAreaSurchargeMultiplier(areaRooftop);
+    if (surcharge > 1) waterproofSurchargeApplied = true;
+    expectedMin += areaRooftop * waterRate.min * surcharge;
+    expectedMax += areaRooftop * waterRate.max * surcharge;
+  }
 
   // 付帯部塗装（破風板・軒天・雨樋・水切りなど）の目安。
   // 外壁・屋根塗装の施工面積（坪換算）に、付帯部の坪単価目安を掛けて算出する。
@@ -1208,7 +1240,11 @@ function calculateDiagnostic(e) {
 
   if (displayMinMan > 0) {
     const attachedNote = paintActive ? '、付帯部塗装の目安を含む' : '';
-    priceCompare.innerText = `適正相場の目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（今回の入力条件に基づく概算${attachedNote}）`;
+    const waterproofNotes = [];
+    if (waterActive && insulation === 'insulated') waterproofNotes.push('断熱材ありの単価で計算');
+    if (waterActive && waterproofSurchargeApplied) waterproofNotes.push('施工面積が小さいため割増しを含む');
+    const waterproofNote = waterproofNotes.length ? `、${waterproofNotes.join('・')}` : '';
+    priceCompare.innerText = `適正相場の目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（今回の入力条件に基づく概算${attachedNote}${waterproofNote}）`;
   } else {
     priceCompare.innerText = '';
   }
@@ -1761,6 +1797,7 @@ function buildShareUrl() {
     price: document.getElementById('total-price').value,
     grade: document.getElementById('paint-grade').value,
     method: document.getElementById('waterproof-method').value,
+    ins: document.getElementById('waterproof-insulation').value,
     disc: document.getElementById('discount-amount').value,
     isk: document.getElementById('chk-isshiki').checked ? 1 : 0,
     np: document.getElementById('chk-no-paint-name').checked ? 1 : 0,
@@ -1817,6 +1854,7 @@ function applySharedStateFromUrl() {
     document.getElementById('total-price').value = state.price;
     document.getElementById('paint-grade').value = state.grade;
     document.getElementById('waterproof-method').value = state.method;
+    document.getElementById('waterproof-insulation').value = state.ins || 'none';
     document.getElementById('discount-amount').value = state.disc;
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
