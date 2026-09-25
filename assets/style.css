@@ -156,6 +156,7 @@ input[type="number"], select, input[type="text"], input[type="tel"], input[type=
 .score-badge { font-size: 32px; font-weight: bold; margin: 6px 0; }
 .score-meaning { font-size: 13px; font-weight: bold; color: #2d3748; margin: 2px 0 8px; }
 .price-compare { font-size: 13px; color: #4a5568; margin-top: 6px; }
+.price-note { font-size: 11px; color: var(--sub); margin-top: 8px; line-height: 1.6; }
 
 /* ==================== フェーズ1: 診断結果の詳細表示 ==================== */
 .disclaimer-box { background:#f7fafc; border:1px solid var(--border); border-radius:10px; padding:12px 14px; font-size:11px; color:var(--sub); line-height:1.6; margin-bottom:16px; }
