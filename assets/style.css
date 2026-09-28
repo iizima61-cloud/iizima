@@ -1,5 +1,9 @@
 :root{
-  --blue:#3182ce; --blue-dark:#2b6cb0; --bg:#f4f6f9; --card:#ffffff;
+  /* 同業他社に多い明るい水色系との差別化のため、紺（ネイビー）系のブランドカラーに変更。
+     --blue/--blue-dark はボタン・見出し・リンクなど全体で共有しているため、
+     ここを紺色にするだけでヘッダーだけでなくアプリ全体のトーンが揃う。 */
+  --blue:#1f3a5f; --blue-dark:#13263f; --bg:#f4f6f9; --card:#ffffff;
+  --accent-gold:#c9a35e; /* 紺色の背景で読みやすい、落ち着いた金色系のアクセント */
   --text:#2d3748; --sub:#718096; --border:#e2e8f0;
   --good:#38a169; --good-bg:#f0fff4; --good-border:#68d391;
   --warn:#dd6b20; --warn-bg:#fffaf0; --warn-border:#f6ad55;
@@ -27,7 +31,8 @@ body {
   text-align: center;
 }
 .topbar .eyebrow { font-size: 10px; margin: 0 0 4px; opacity: .85; letter-spacing: .02em; }
-.topbar h1 { font-size: 18px; margin: 0 0 4px; font-weight: bold; }
+.topbar h1 { font-size: 18px; margin: 0 0 4px; font-weight: bold; line-height: 1.4; }
+.topbar h1 .h1-accent { color: var(--accent-gold); }
 .topbar p { font-size: 11px; margin: 0; opacity: .9; }
 .topbar .topbar-company { margin-top: 8px; opacity: .8; }
 
@@ -53,10 +58,10 @@ main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 .nav-btn.active { color: var(--blue-dark); }
 
 /* ==================== 共通カード ==================== */
-.intro { background:#ebf8ff; border:1px solid #bee3f8; border-radius:10px; padding:14px 16px; font-size:13px; color:#2c5282; margin-bottom:16px; }
-.intro b { color:#1a365d; }
+.intro { background:#eef2f7; border:1px solid #ccd6e2; border-radius:10px; padding:14px 16px; font-size:13px; color:var(--blue); margin-bottom:16px; }
+.intro b { color:var(--blue-dark); }
 .steps-row { display:flex; gap:8px; margin:10px 0; flex-wrap:wrap; }
-.step-chip { flex:1 1 90px; background:#fff; border:1px solid #bee3f8; border-radius:8px; padding:8px 6px; font-size:11px; color:#2c5282; text-align:center; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.step-chip { flex:1 1 90px; background:#fff; border:1px solid #ccd6e2; border-radius:8px; padding:8px 6px; font-size:11px; color:var(--blue); text-align:center; display:flex; flex-direction:column; align-items:center; gap:4px; }
 
 .hero-cta-btn { margin-bottom:14px; font-size:15px; }
 
@@ -145,7 +150,7 @@ input[type="number"], select, input[type="text"], input[type="tel"], input[type=
 
 /* フォーム下部の固定送信バー（スマホでスクロールしても押しやすい） */
 .sticky-cta { position: sticky; bottom: calc(64px + var(--safe-bottom)); z-index: 10; padding-top: 6px; margin-top: 4px; }
-.sticky-cta .btn-submit { box-shadow: 0 4px 14px rgba(49,130,206,0.35); }
+.sticky-cta .btn-submit { box-shadow: 0 4px 14px rgba(31,58,95,0.35); }
 
 #result-area { display: none; margin-top: 4px; }
 .score-box { text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 16px; }
