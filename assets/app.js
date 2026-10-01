@@ -202,9 +202,9 @@ function initUpload() {
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
   });
-  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+  fileInput.addEventListener('change', e => { if (e.target.files.length) handleFiles(e.target.files); });
 
   document.getElementById('selected-file-clear').addEventListener('click', e => {
     e.stopPropagation();
@@ -216,35 +216,58 @@ function initUpload() {
   }
 }
 
-let selectedFileThumbUrl = null;
-async function showSelectedFile(file) {
-  const info = document.getElementById('selected-file-info');
-  const nameEl = document.getElementById('selected-file-name');
-  const thumbEl = document.getElementById('selected-file-thumb');
+const MAX_UPLOAD_FILES = 5;      // 1回に読み込める見積書は最大5枚（PDFは1ファイルを1枚と数える）
+const FILE_TIMEOUT_MS = 30000;   // 1枚あたりの読み取り制限時間
 
-  nameEl.textContent = file.name;
-  info.classList.add('show');
+// 選ばれたファイルから、画像・PDFだけを選択順のまま最大5枚取り出す。
+function pickUploadFiles(fileList) {
+  const all = Array.from(fileList || []);
+  const valid = all.filter(f => f.type === 'application/pdf' || (f.type || '').startsWith('image/'));
+  const notices = [];
+  if (all.length > valid.length) notices.push(`画像（JPG/PNG）・PDF以外のファイル${all.length - valid.length}件は読み込まずに飛ばしました。`);
+  if (valid.length > MAX_UPLOAD_FILES) notices.push(`最初の${MAX_UPLOAD_FILES}枚だけ読み込みました。`);
+  return { files: valid.slice(0, MAX_UPLOAD_FILES), notices };
+}
 
-  if (selectedFileThumbUrl) { URL.revokeObjectURL(selectedFileThumbUrl); selectedFileThumbUrl = null; }
-  thumbEl.classList.remove('show');
-  thumbEl.removeAttribute('src');
-
-  if (file.type.startsWith('image/')) {
-    selectedFileThumbUrl = URL.createObjectURL(file);
-    thumbEl.src = selectedFileThumbUrl;
-    thumbEl.classList.add('show');
-  } else if (file.type === 'application/pdf') {
-    try {
-      const dataUrl = await renderPdfThumbnail(file);
-      if (dataUrl && document.getElementById('selected-file-name').textContent === file.name) {
-        thumbEl.src = dataUrl;
-        thumbEl.classList.add('show');
-        renderResultFileInfo();
-      }
-    } catch (err) {
-      console.warn('PDFのプレビュー画像を作成できませんでした。', err);
+// 選んだ全ファイルのサムネイルを横並びで表示する（画像はすぐ、PDFは1ページ目を描画できた順に表示）。
+function renderFileThumbs(box, files, urls, isCurrent, onUpdate) {
+  urls.forEach(u => URL.revokeObjectURL(u));
+  urls.length = 0;
+  box.innerHTML = '';
+  files.forEach(file => {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.addEventListener('click', () => openImagePreview(img.src));
+    box.appendChild(img);
+    if ((file.type || '').startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      urls.push(url);
+      img.src = url;
+      img.classList.add('show');
+    } else if (file.type === 'application/pdf') {
+      renderPdfThumbnail(file).then(dataUrl => {
+        if (dataUrl && isCurrent()) {
+          img.src = dataUrl;
+          img.classList.add('show');
+          if (onUpdate) onUpdate();
+        }
+      }).catch(err => console.warn('PDFのプレビュー画像を作成できませんでした。', err));
     }
-  }
+  });
+}
+
+function fileSummary(files) {
+  return files.length === 1 ? files[0].name : `${files.length}枚を選択中`;
+}
+
+let selectedFileThumbUrls = [];
+let selectedFilesGen = 0;
+function showSelectedFiles(files) {
+  const gen = ++selectedFilesGen;
+  document.getElementById('selected-file-name').textContent = fileSummary(files);
+  document.getElementById('selected-file-info').classList.add('show');
+  renderFileThumbs(document.getElementById('selected-file-thumbs'), files, selectedFileThumbUrls,
+    () => gen === selectedFilesGen, renderResultFileInfo);
 }
 
 async function renderPdfThumbnail(file) {
@@ -261,9 +284,13 @@ async function renderPdfThumbnail(file) {
   return canvas.toDataURL('image/png');
 }
 function clearSelectedFile() {
+  selectedFilesGen++;
   document.getElementById('selected-file-info').classList.remove('show');
   document.getElementById('file-input').value = '';
-  if (selectedFileThumbUrl) { URL.revokeObjectURL(selectedFileThumbUrl); selectedFileThumbUrl = null; }
+  selectedFileThumbUrls.forEach(u => URL.revokeObjectURL(u));
+  selectedFileThumbUrls = [];
+  document.getElementById('selected-file-thumbs').innerHTML = '';
+  showScanNotice('');
 }
 
 // ids を渡すと、単体診断の読み込み状況表示（#scan-status等）以外の場所
@@ -271,56 +298,105 @@ function clearSelectedFile() {
 // 省略した場合は今まで通り単体診断の表示要素を使うため、既存の挙動は変わらない。
 function setScanStatus(text, percent, ids) {
   ids = ids || { status: 'scan-status', progress: 'scan-progress', bar: 'scan-progress-bar' };
+  if (ids.dead) return; // 時間切れになった読み取りが裏で動き続けても、表示は書き換えない
   const statusEl = document.getElementById(ids.status);
   const progEl = document.getElementById(ids.progress);
   const barEl = document.getElementById(ids.bar);
   if (!statusEl || !progEl || !barEl) return;
   if (text === null) { statusEl.style.display = 'none'; progEl.style.display = 'none'; return; }
   statusEl.style.display = 'block';
-  statusEl.innerText = text;
+  // 複数枚のときは「（2/3枚目）」を文末の「…」の前に付ける
+  statusEl.innerText = ids.label ? text.replace(/…$/, ids.label + '…') : text;
   if (typeof percent === 'number') {
     progEl.style.display = 'block';
+    // 複数枚のときは、全体の中でその1枚が占める範囲に進捗を割り当てる
+    if (typeof ids.span === 'number') percent = ids.base + percent * ids.span / 100;
     barEl.style.width = Math.max(0, Math.min(100, percent)) + '%';
   }
 }
 
-async function handleFile(file) {
-  showSelectedFile(file);
+function showScanNotice(text) {
+  const el = document.getElementById('scan-notice');
+  if (!el) return;
+  el.innerText = text;
+  el.style.display = text ? 'block' : 'none';
+}
 
+// 1枚分の読み取り。制限時間は1枚あたり30秒（PDFは1ページ読めるたびに時間を数え直す）。
+function readOneFile(file, ids) {
   const isPdf = file.type === 'application/pdf';
-  const isImage = file.type.startsWith('image/');
+  if (isPdf && typeof pdfjsLib === 'undefined') return Promise.reject(new Error('LIB_PDF'));
+  if (!isPdf && typeof Tesseract === 'undefined') return Promise.reject(new Error('LIB_IMG'));
+  return new Promise((resolve, reject) => {
+    let timer;
+    const kick = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { ids.dead = true; reject(new Error('TIMEOUT')); }, FILE_TIMEOUT_MS);
+    };
+    kick();
+    (isPdf ? extractTextFromPDF(file, ids, kick) : extractTextFromImage(file, ids))
+      .then(resolve, reject)
+      .finally(() => clearTimeout(timer));
+  });
+}
 
-  if (!isPdf && !isImage) {
-    alert('画像（JPG/PNG）またはPDFファイルを選択してください。');
-    return;
+// 選択順に1枚ずつ（同時には走らせない）読み取り、読めた分の文字を空行2つでつなげて返す。
+// 1枚も読めなかったときだけ、最後のエラーを投げる。
+async function extractTextFromFiles(files, baseIds) {
+  const n = files.length;
+  const texts = [];
+  let failed = 0;
+  let lastErr = null;
+  for (let i = 0; i < n; i++) {
+    const ids = Object.assign({}, baseIds);
+    if (n > 1) { ids.label = `（${i + 1}/${n}枚目）`; ids.base = i / n * 100; ids.span = 100 / n; }
+    setScanStatus('見積書を読み込んでいます…', 5, ids);
+    try {
+      texts.push(await readOneFile(files[i], ids));
+    } catch (err) {
+      console.error(err);
+      failed++;
+      lastErr = err;
+    }
   }
-  if (isPdf && typeof pdfjsLib === 'undefined') {
-    alert('PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。\n\n・インターネットに接続されているかご確認のうえ、ページを再読み込みしてお試しください。\n・改善しない場合は、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
-    return;
-  }
-  if (isImage && typeof Tesseract === 'undefined') {
-    alert('写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。\n\n・インターネットに接続されているかご確認のうえ、ページを再読み込みしてお試しください。\n・改善しない場合は、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
-    return;
-  }
+  if (!texts.length) throw lastErr || new Error('読み取れるファイルがありませんでした');
+  return { text: texts.join('\n\n'), failed, total: n };
+}
 
+let scanBusy = false;
+
+async function handleFiles(fileList) {
+  if (scanBusy) { showScanNotice('読み込み中です。終わるまでお待ちください。'); return; }
+  const { files, notices } = pickUploadFiles(fileList);
+  if (!files.length) { showScanNotice('画像（JPG/PNG）またはPDFファイルを選択してください。'); return; }
+  showSelectedFiles(files);
+  showScanNotice(notices.join('\n'));
+
+  scanBusy = true;
   try {
-    setScanStatus('見積書を読み込んでいます…', 5);
-    const extractPromise = isPdf ? extractTextFromPDF(file) : extractTextFromImage(file);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000));
-    const text = await Promise.race([extractPromise, timeoutPromise]);
+    const { text, failed, total } = await extractTextFromFiles(files,
+      { status: 'scan-status', progress: 'scan-progress', bar: 'scan-progress-bar' });
     setScanStatus('内容を解析しています…', 95);
     const normalized = normalizeText(text);
     const data = analyzeText(normalized);
     applyExtractedData(data, extractRoofPaintInfo(normalized));
     setScanStatus(null);
+    if (failed) showScanNotice(notices.concat(`${total}枚中${failed}枚は読み取れませんでした。金額や面積が正しいか確認してください`).join('\n'));
   } catch (err) {
     console.error(err);
     setScanStatus(null);
-    if (err && err.message === 'TIMEOUT') {
+    const code = err && err.message;
+    if (code === 'LIB_PDF') {
+      alert('PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。\n\n・インターネットに接続されているかご確認のうえ、ページを再読み込みしてお試しください。\n・改善しない場合は、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
+    } else if (code === 'LIB_IMG') {
+      alert('写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。\n\n・インターネットに接続されているかご確認のうえ、ページを再読み込みしてお試しください。\n・改善しない場合は、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
+    } else if (code === 'TIMEOUT') {
       alert('30秒待っても読み込みが完了しませんでした。\n\nこのファイルの自動読み取りはうまくいかない可能性があります。お手数ですが、見積書の文字を「文字を貼り付ける」欄にコピーして貼り付けてください。');
     } else {
-      alert('読み込み中にエラーが発生しました。お手数ですが、下の「文字を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (err && err.message ? err.message : err) + ')');
+      alert('読み込み中にエラーが発生しました。お手数ですが、下の「文字を貼り付ける」欄をお試しください。\n\n(エラー内容: ' + (code ? code : err) + ')');
     }
+  } finally {
+    scanBusy = false;
   }
 }
 
@@ -351,7 +427,7 @@ function getTesseractWorkerPath() {
   return tesseractWorkerBlobUrlPromise;
 }
 
-async function extractTextFromPDF(file, statusIds) {
+async function extractTextFromPDF(file, statusIds, kick) {
   const buf = await file.arrayBuffer();
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -361,16 +437,23 @@ async function extractTextFromPDF(file, statusIds) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     text += content.items.map(it => it.str).join(' ') + '\n';
+    if (kick) kick();
   }
   // テキストがほぼ無い＝スキャン画像PDFの可能性 → OCRへフォールバック
   if (text.replace(/\s/g, '').length < 20) {
     setScanStatus('画像として認識しています（少し時間がかかります）…', 20, statusIds);
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 2.0 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width; canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    text = await ocrCanvas(canvas, statusIds);
+    // スキャン画像のPDFは最大5ページまで順に文字認識する
+    const pages = [];
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      pages.push(await ocrCanvas(canvas, statusIds));
+      if (kick) kick();
+    }
+    text = pages.join('\n\n');
   }
   return text;
 }
@@ -1359,9 +1442,9 @@ function renderResultFileInfo() {
     return;
   }
   const name = document.getElementById('selected-file-name').textContent;
-  const thumb = document.getElementById('selected-file-thumb');
-  const thumbHtml = thumb.classList.contains('show') ? `<img class="show" src="${thumb.src}" alt="" onclick="openImagePreview(this.src)">` : '';
-  box.innerHTML = `${thumbHtml}<span class="name">📎 読み込んだ見積書：${name}</span>`;
+  const thumbHtml = Array.from(document.querySelectorAll('#selected-file-thumbs img.show'))
+    .map(img => `<img class="show" src="${img.src}" alt="" onclick="openImagePreview(this.src)">`).join('');
+  box.innerHTML = `<span class="file-thumbs">${thumbHtml}</span><span class="name">📎 読み込んだ見積書：${name}</span>`;
   box.classList.add('show');
 }
 
@@ -1388,7 +1471,9 @@ function copyTemplate(id, btn) {
    3つのスロット分だけ再利用する。単体診断のフォーム・結果表示には一切書き込まない。
 ==================================================================== */
 let compareTexts = [null, null, null]; // 各社の読み取り済みテキスト（正規化済み）
-let compareFileThumbUrls = [null, null, null];
+let compareFileThumbUrls = [[], [], []];
+let compareFilesGen = [0, 0, 0];
+let compareBusy = [false, false, false];
 
 function initCompareUpload() {
   for (let n = 1; n <= 3; n++) {
@@ -1401,9 +1486,9 @@ function initCompareUpload() {
     dropZone.addEventListener('drop', e => {
       e.preventDefault();
       dropZone.classList.remove('dragover');
-      if (e.dataTransfer.files.length) handleCompareFile(slot, e.dataTransfer.files[0]);
+      if (e.dataTransfer.files.length) handleCompareFiles(slot, e.dataTransfer.files);
     });
-    fileInput.addEventListener('change', e => { if (e.target.files.length) handleCompareFile(slot, e.target.files[0]); });
+    fileInput.addEventListener('change', e => { if (e.target.files.length) handleCompareFiles(slot, e.target.files); });
   }
 }
 
@@ -1411,39 +1496,21 @@ function compareStatusIds(slot) {
   return { status: `compare-status-${slot}`, progress: `compare-progress-${slot}`, bar: `compare-progress-bar-${slot}` };
 }
 
-async function showCompareFile(slot, file) {
-  const info = document.getElementById(`compare-file-info-${slot}`);
-  const nameEl = document.getElementById(`compare-file-name-${slot}`);
-  const thumbEl = document.getElementById(`compare-file-thumb-${slot}`);
-
-  nameEl.textContent = file.name;
-  info.classList.add('show');
-
-  if (compareFileThumbUrls[slot - 1]) { URL.revokeObjectURL(compareFileThumbUrls[slot - 1]); compareFileThumbUrls[slot - 1] = null; }
-  thumbEl.classList.remove('show');
-  thumbEl.removeAttribute('src');
-
-  if (file.type.startsWith('image/')) {
-    compareFileThumbUrls[slot - 1] = URL.createObjectURL(file);
-    thumbEl.src = compareFileThumbUrls[slot - 1];
-    thumbEl.classList.add('show');
-  } else if (file.type === 'application/pdf') {
-    try {
-      const dataUrl = await renderPdfThumbnail(file);
-      if (dataUrl && document.getElementById(`compare-file-name-${slot}`).textContent === file.name) {
-        thumbEl.src = dataUrl;
-        thumbEl.classList.add('show');
-      }
-    } catch (err) {
-      console.warn('PDFのプレビュー画像を作成できませんでした。', err);
-    }
-  }
+function showCompareFiles(slot, files) {
+  const gen = ++compareFilesGen[slot - 1];
+  document.getElementById(`compare-file-name-${slot}`).textContent = fileSummary(files);
+  document.getElementById(`compare-file-info-${slot}`).classList.add('show');
+  renderFileThumbs(document.getElementById(`compare-file-thumbs-${slot}`), files, compareFileThumbUrls[slot - 1],
+    () => gen === compareFilesGen[slot - 1]);
 }
 
 function clearCompareFile(slot) {
+  compareFilesGen[slot - 1]++;
   document.getElementById(`compare-file-info-${slot}`).classList.remove('show');
   document.getElementById(`compare-file-${slot}`).value = '';
-  if (compareFileThumbUrls[slot - 1]) { URL.revokeObjectURL(compareFileThumbUrls[slot - 1]); compareFileThumbUrls[slot - 1] = null; }
+  compareFileThumbUrls[slot - 1].forEach(u => URL.revokeObjectURL(u));
+  compareFileThumbUrls[slot - 1] = [];
+  document.getElementById(`compare-file-thumbs-${slot}`).innerHTML = '';
   compareTexts[slot - 1] = null;
 }
 
@@ -1460,43 +1527,41 @@ function showCompareMessage(slot, text, isError) {
   el.innerText = text;
 }
 
-async function handleCompareFile(slot, file) {
-  showCompareFile(slot, file);
-
-  const isPdf = file.type === 'application/pdf';
-  const isImage = file.type.startsWith('image/');
+async function handleCompareFiles(slot, fileList) {
+  if (compareBusy[slot - 1]) { showCompareMessage(slot, '読み込み中です。終わるまでお待ちください。', false); return; }
+  const { files, notices } = pickUploadFiles(fileList);
   const statusIds = compareStatusIds(slot);
-
-  if (!isPdf && !isImage) {
+  if (!files.length) {
     showCompareMessage(slot, '⚠️ 画像（JPG/PNG）またはPDFファイルを選択してください。', true);
     return;
   }
-  if (isPdf && typeof pdfjsLib === 'undefined') {
-    showCompareMessage(slot, '⚠️ PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
-    return;
-  }
-  if (isImage && typeof Tesseract === 'undefined') {
-    showCompareMessage(slot, '⚠️ 写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
-    return;
-  }
+  showCompareFiles(slot, files);
 
+  compareBusy[slot - 1] = true;
   try {
-    setScanStatus('見積書を読み込んでいます…', 5, statusIds);
-    const extractPromise = isPdf ? extractTextFromPDF(file, statusIds) : extractTextFromImage(file, statusIds);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000));
-    const text = await Promise.race([extractPromise, timeoutPromise]);
+    const { text, failed, total } = await extractTextFromFiles(files, statusIds);
     compareTexts[slot - 1] = normalizeText(text);
     setScanStatus(null, null, statusIds);
-    showCompareMessage(slot, '✅ 読み取りが完了しました。', false);
+    const lines = notices.slice();
+    if (failed) lines.push(`⚠️ ${total}枚中${failed}枚は読み取れませんでした。金額や面積が正しいか確認してください`);
+    lines.push('✅ 読み取りが完了しました。');
+    showCompareMessage(slot, lines.join('\n'), failed > 0);
   } catch (err) {
     console.error(err);
     setScanStatus(null, null, statusIds);
     compareTexts[slot - 1] = null;
-    if (err && err.message === 'TIMEOUT') {
+    const code = err && err.message;
+    if (code === 'LIB_PDF') {
+      showCompareMessage(slot, '⚠️ PDFを読み取る部品がインターネットから取得できていないため、PDFの自動読み取りができません。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
+    } else if (code === 'LIB_IMG') {
+      showCompareMessage(slot, '⚠️ 写真から文字を読み取る部品がインターネットから取得できていないため、画像の自動読み取りができません。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
+    } else if (code === 'TIMEOUT') {
       showCompareMessage(slot, '⚠️ 30秒待っても読み込みが完了しませんでした。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
     } else {
       showCompareMessage(slot, '⚠️ 読み込み中にエラーが発生しました。お手数ですが、下の「文章を貼り付ける」欄をお試しください。', true);
     }
+  } finally {
+    compareBusy[slot - 1] = false;
   }
 }
 

@@ -51,20 +51,21 @@
 
       <div class="card">
         <h2><span class="step-num">1</span> 見積書を読み込む（任意）</h2>
-        <div class="hint">写真（JPG/PNG）またはPDFを選ぶと、金額や面積、塗料の種類などをAIが自動で読み取ってフォームに入力します。読み込まなくても、下のフォームに直接入力すれば診断できます。</div>
+        <div class="hint">写真（JPG/PNG）またはPDFを選ぶと、金額や面積、塗料の種類などをAIが自動で読み取ってフォームに入力します。読み込まなくても、下のフォームに直接入力すれば診断できます。<b>見積書が何枚かある場合は、表紙と内訳をまとめて選んでください（最大5枚）。</b></div>
         <div id="lib-status"></div>
         <div id="drop-zone">
           <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
-          <p>またはタップしてファイルを選択（写真 / PDF）</p>
-          <input type="file" id="file-input" accept="image/*,application/pdf">
+          <p>またはタップしてファイルを選択（写真 / PDF・複数枚OK）</p>
+          <input type="file" id="file-input" accept="image/*,application/pdf" multiple>
         </div>
         <div id="selected-file-info" class="selected-file-info">
-          <img id="selected-file-thumb" alt="" onclick="openImagePreview(this.src)">
+          <span class="file-thumbs" id="selected-file-thumbs"></span>
           <span class="name" id="selected-file-name"></span>
           <button type="button" class="clear-btn" id="selected-file-clear" aria-label="選択を解除">✕</button>
         </div>
         <div id="scan-status">解析中です…</div>
         <div id="scan-progress"><div id="scan-progress-bar"></div></div>
+        <div id="scan-notice" class="hint" style="display:none;white-space:pre-line;"></div>
 
         <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
         <label for="paste-text" style="font-weight:normal;font-size:12px;color:#718096;">見積書の文字をコピーしてこちらに貼り付けることもできます</label>
@@ -371,11 +372,11 @@
         <h2><span class="step-num">1</span> 1社目の見積書</h2>
         <div class="mini-drop-zone" id="compare-drop-1">
           <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
-          <p>またはタップしてファイルを選択（写真 / PDF）</p>
-          <input type="file" id="compare-file-1" class="compare-file-input" accept="image/*,application/pdf">
+          <p>またはタップしてファイルを選択（写真 / PDF・複数枚OK）</p>
+          <input type="file" id="compare-file-1" class="compare-file-input" accept="image/*,application/pdf" multiple>
         </div>
         <div class="selected-file-info" id="compare-file-info-1">
-          <img id="compare-file-thumb-1" alt="" onclick="openImagePreview(this.src)">
+          <span class="file-thumbs" id="compare-file-thumbs-1"></span>
           <span class="name" id="compare-file-name-1"></span>
           <button type="button" class="clear-btn" onclick="clearCompareFile(1)" aria-label="選択を解除">✕</button>
         </div>
@@ -390,11 +391,11 @@
         <h2><span class="step-num">2</span> 2社目の見積書</h2>
         <div class="mini-drop-zone" id="compare-drop-2">
           <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
-          <p>またはタップしてファイルを選択（写真 / PDF）</p>
-          <input type="file" id="compare-file-2" class="compare-file-input" accept="image/*,application/pdf">
+          <p>またはタップしてファイルを選択（写真 / PDF・複数枚OK）</p>
+          <input type="file" id="compare-file-2" class="compare-file-input" accept="image/*,application/pdf" multiple>
         </div>
         <div class="selected-file-info" id="compare-file-info-2">
-          <img id="compare-file-thumb-2" alt="" onclick="openImagePreview(this.src)">
+          <span class="file-thumbs" id="compare-file-thumbs-2"></span>
           <span class="name" id="compare-file-name-2"></span>
           <button type="button" class="clear-btn" onclick="clearCompareFile(2)" aria-label="選択を解除">✕</button>
         </div>
@@ -409,11 +410,11 @@
         <h2><span class="step-num">3</span> 3社目の見積書</h2>
         <div class="mini-drop-zone" id="compare-drop-3">
           <p class="big">📄 ここに見積書をドラッグ＆ドロップ</p>
-          <p>またはタップしてファイルを選択（写真 / PDF）</p>
-          <input type="file" id="compare-file-3" class="compare-file-input" accept="image/*,application/pdf">
+          <p>またはタップしてファイルを選択（写真 / PDF・複数枚OK）</p>
+          <input type="file" id="compare-file-3" class="compare-file-input" accept="image/*,application/pdf" multiple>
         </div>
         <div class="selected-file-info" id="compare-file-info-3">
-          <img id="compare-file-thumb-3" alt="" onclick="openImagePreview(this.src)">
+          <span class="file-thumbs" id="compare-file-thumbs-3"></span>
           <span class="name" id="compare-file-name-3"></span>
           <button type="button" class="clear-btn" onclick="clearCompareFile(3)" aria-label="選択を解除">✕</button>
         </div>
