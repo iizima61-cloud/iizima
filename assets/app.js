@@ -1774,6 +1774,8 @@ function openImagePreview(src) {
    会社側で google-apps-script/Code.gs をデプロイし、CONFIG.sheetsWebhookUrl を設定すると、
    お客様が「相談したい」を選んだ場合に診断結果と連絡先がスプレッドシートに自動で貯まります。
 ==================================================================== */
+const LEAD_SEND_TIMEOUT_MS = 20000; // 相談フォームの返事を待つ時間
+
 function setupLeadCard(diagnosis) {
   const card = document.getElementById('lead-card');
   if (!CONFIG.sheetsWebhookUrl) {
@@ -1785,6 +1787,8 @@ function setupLeadCard(diagnosis) {
   const statusEl = document.getElementById('lead-status');
   statusEl.classList.remove('show');
   statusEl.innerText = '';
+  const fallbackEl = document.getElementById('lead-fallback');
+  if (fallbackEl) fallbackEl.classList.remove('show');
   // 送信前チェック・送信失敗時のメッセージは alert() を使わず、既存の
   // #lead-status 欄にテキストで表示する（フリーズ調査への対応：スマホで
   // 名前・連絡先などの入力直後に同期的な alert() を呼ぶと、仮想キーボードが
@@ -1809,11 +1813,16 @@ function setupLeadCard(diagnosis) {
     const submitBtn = form.querySelector('button[type=submit]');
     submitBtn.disabled = true;
     submitBtn.innerText = '送信中…';
+    if (fallbackEl) fallbackEl.classList.remove('show');
+    // Apps Script の返事（{"result":"ok"}）を確認できたときだけ「成功」にする。
+    // 返事が読めない・時間切れ・エラーのときは入力を残し、LINE・電話の案内を出す。
+    const abortCtl = new AbortController();
+    const abortTimer = setTimeout(() => abortCtl.abort(), LEAD_SEND_TIMEOUT_MS);
     try {
-      await fetch(CONFIG.sheetsWebhookUrl, {
+      const res = await fetch(CONFIG.sheetsWebhookUrl, {
         method: 'POST',
-        mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
+        signal: abortCtl.signal,
         body: JSON.stringify({
           name, contact, memo, topics,
           score: diagnosis.score,
@@ -1829,6 +1838,9 @@ function setupLeadCard(diagnosis) {
           timestamp: new Date(diagnosis.timestamp).toISOString()
         })
       });
+      let reply = null;
+      try { reply = JSON.parse(await res.text()); } catch (_) { /* 返事が読めない */ }
+      if (!res.ok || !reply || reply.result !== 'ok') throw new Error('受信を確認できませんでした');
       showLeadMessage('✅ 送信しました。担当者よりご連絡いたします。', false);
       form.reset();
       if (typeof gtag === 'function') {
@@ -1836,8 +1848,10 @@ function setupLeadCard(diagnosis) {
       }
     } catch (err) {
       console.error(err);
-      showLeadMessage('⚠️ 送信に失敗しました。通信環境をご確認のうえ、もう一度お試しください。', true);
+      showLeadMessage('⚠️ 送信できたか確認できませんでした。入力内容はそのまま残してあります。お手数ですが、もう一度お試しいただくか、下のボタンからLINEまたはお電話でご連絡ください。', true);
+      if (fallbackEl) fallbackEl.classList.add('show');
     } finally {
+      clearTimeout(abortTimer);
       submitBtn.disabled = false;
       submitBtn.innerText = 'この内容で相談する';
     }
