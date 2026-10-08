@@ -1,0 +1,698 @@
+<title>外壁カラーシミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: 左に写真、右に操作パネル。スマホでは写真の下に操作を縦積み。 */
+:root{
+  --bg:#f2f1ee; --surface:#ffffff; --ink:#1c2430; --muted:#5e6875; --line:#d9d7d1;
+  --accent:#0e6f8f; --accent-ink:#ffffff; --accent-soft:#e1f0f5;
+  --warn-bg:#fff3dc; --warn-ink:#7a4a00; --danger:#b3261e;
+  --font:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14181e; --surface:#1d232b; --ink:#e8ebef; --muted:#9aa3af; --line:#323a45;
+    --accent:#4cb5d6; --accent-ink:#06222c; --accent-soft:#16323c;
+    --warn-bg:#3a2e14; --warn-ink:#f0c070; --danger:#f2867f; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14181e; --surface:#1d232b; --ink:#e8ebef; --muted:#9aa3af; --line:#323a45;
+  --accent:#4cb5d6; --accent-ink:#06222c; --accent-soft:#16323c;
+  --warn-bg:#3a2e14; --warn-ink:#f0c070; --danger:#f2867f; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.6;
+  padding-inline:16px;padding-block:14px 40px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.02em}
+header small{color:var(--muted)}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+@media (max-width:860px){.app{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.stage{padding:10px}
+.stagebox{position:relative;line-height:0;border-radius:6px;overflow:hidden;background:#0001;touch-action:manipulation;cursor:crosshair}
+.stagebox canvas{display:block;width:100%;height:auto}
+#cOrig{position:absolute;inset:0;pointer-events:none}
+#dots{position:absolute;inset:0;pointer-events:none}
+.dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:2px solid #fff;
+  box-shadow:0 0 0 1.5px #000a;color:#fff;font-size:12px;font-weight:700;line-height:22px;text-align:center;
+  pointer-events:auto;cursor:pointer;text-shadow:0 0 3px #000}
+.stagetools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.stagetools .cmp{flex:1 1 220px;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.stagetools input[type=range]{flex:1;min-width:80px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;min-height:44px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.small{min-height:36px;padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:default}
+.hint{margin:0 0 10px;padding:9px 12px;border-radius:8px;background:var(--accent-soft);font-size:14px}
+.panel{display:flex;flex-direction:column;gap:14px}
+.panel h2{font-size:14px;margin:0 0 8px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+.row{display:flex;align-items:center;gap:8px;padding:6px;border:2px solid transparent;border-radius:10px;cursor:pointer}
+.row.active{border-color:var(--accent);background:var(--accent-soft)}
+.sw{flex:none;width:46px;height:46px;border-radius:8px;border:1px solid #0004;position:relative;padding:0}
+.sw span{position:absolute;left:3px;top:1px;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 3px #000}
+.rowname{flex:1;min-width:0;line-height:1.3}
+.rowname input{width:100%;border:0;background:transparent;font-weight:700;padding:2px 0;border-bottom:1px dashed transparent}
+.rowname input:focus{border-bottom-color:var(--accent);outline:none}
+.rowname small{color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.x{flex:none;width:34px;height:34px;border-radius:8px;border:0;background:transparent;color:var(--muted);font-size:18px}
+.x:hover{color:var(--danger)}
+.field{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.field label{font-size:13px;color:var(--muted)}
+.field input[type=text]{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;min-height:42px;width:100%}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.note{margin:0;padding:9px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn-ink);font-size:13px;line-height:1.5}
+.plans h2{font-size:16px;margin:22px 0 10px;color:var(--ink);letter-spacing:0}
+.plangrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.plan{padding:8px;cursor:pointer;text-align:left}
+.plan img{width:100%;height:auto;border-radius:6px;display:block}
+.plan b{display:block;margin-top:6px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.chip{width:20px;height:20px;border-radius:4px;border:1px solid #0004}
+.empty{color:var(--muted);padding:18px;border:1px dashed var(--line);border-radius:10px;text-align:center;grid-column:1/-1}
+.overlay{position:fixed;inset:0;z-index:50;background:#000b;display:flex;align-items:center;justify-content:center;padding:16px}
+.overlay[hidden]{display:none}
+.modal{background:var(--surface);border-radius:12px;max-width:560px;width:100%;max-height:calc(100% - 8px);overflow:auto;padding:16px}
+.modal.wide{max-width:1000px}
+.modal h3{margin:0 0 10px;font-size:17px}
+.modalbar{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pv{display:flex;gap:10px;align-items:center}
+.pv .big{width:64px;height:64px;border-radius:10px;border:1px solid #0004;flex:none}
+.pv .col{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.pv input[type=text]{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;min-height:38px;width:100%}
+.pv input[type=color]{width:46px;height:38px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;flex:none}
+.pv .line{display:flex;gap:8px;align-items:center}
+.search{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;min-height:42px;margin:12px 0 6px}
+.lib{max-height:300px;overflow:auto}
+.lib h4{margin:10px 0 6px;font-size:13px;color:var(--muted)}
+.swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:6px}
+.swb{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:4px;text-align:center;font-size:11px;line-height:1.25}
+.swb i{display:block;height:34px;border-radius:5px;border:1px solid #0003;margin-bottom:3px}
+.swb:hover{border-color:var(--accent)}
+details{margin-top:12px}
+summary{cursor:pointer;color:var(--accent);font-weight:500}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px;margin-top:6px;font-size:13px}
+.viewimg{width:100%;height:auto;border-radius:8px;display:block}
+.viewgrid{display:grid;gap:10px;grid-template-columns:repeat(var(--n,1),minmax(0,1fr))}
+@media (max-width:600px){.viewgrid{grid-template-columns:minmax(0,1fr)}}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;z-index:80;max-width:calc(100% - 32px)}
+.toast[hidden]{display:none}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 0;font-size:13px;color:var(--muted)}
+.legend span{display:flex;gap:6px;align-items:center}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>外壁カラーシミュレーター</h1>
+    <small>写真をタップした場所だけ、選んだ色に塗り替えます</small>
+  </header>
+
+  <div class="app">
+    <section class="card stage">
+      <div class="stagebox" id="stagebox" aria-label="建物の写真。塗りたい場所をタップしてください">
+        <canvas id="cRes"></canvas>
+        <canvas id="cOrig"></canvas>
+        <div id="dots"></div>
+      </div>
+      <div class="stagetools">
+        <label class="cmp"><span>塗装後</span>
+          <input type="range" id="cmp" min="0" max="100" value="0" aria-label="元の写真と塗装後の比較">
+          <span>元の写真</span></label>
+        <button class="btn small" id="undo">ひとつ戻す</button>
+        <button class="btn small" id="reset">全部戻す</button>
+      </div>
+      <p class="legend" id="legend">写真上の丸い番号をタップすると、その塗り箇所を消せます。</p>
+    </section>
+
+    <aside class="panel">
+      <div class="card">
+        <h2>① 写真</h2>
+        <div class="btns" style="margin-top:0">
+          <button class="btn primary" id="pick">写真を選ぶ</button>
+          <button class="btn" id="sample">サンプルで試す</button>
+        </div>
+        <input type="file" id="file" accept="image/*" hidden>
+        <p class="note" style="margin-top:10px">建物の全体が写った、できるだけ正面から撮った写真が向いています。</p>
+      </div>
+
+      <div class="card">
+        <h2>② 塗り分け箇所と色</h2>
+        <div id="parts"></div>
+        <div class="btns"><button class="btn small" id="addPart">＋ 箇所を追加（最大10）</button></div>
+      </div>
+
+      <div class="card">
+        <h2>③ 塗る範囲</h2>
+        <p class="hint" id="hint"></p>
+        <label class="cmp" style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px">
+          <span>狭い</span><input type="range" id="tol" min="10" max="70" value="32" style="flex:1" aria-label="塗る範囲の広さ"><span>広い</span></label>
+        <p style="margin:6px 0 0;font-size:12px;color:var(--muted)">はみ出すときは「狭く」、塗り残しが出るときは「広く」。</p>
+      </div>
+
+      <div class="card">
+        <h2>④ 保存</h2>
+        <div class="field" style="margin-top:0"><label for="owner">物件名・お客様名（報告書に入ります）</label>
+          <input type="text" id="owner" placeholder="例：山田様邸 外壁塗装工事"></div>
+        <div class="field"><label for="planName">プラン名</label><input type="text" id="planName" value="プランA"></div>
+        <div class="btns">
+          <button class="btn primary" id="savePlan">このプランを保存</button>
+          <button class="btn" id="report">報告書を作る</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="plans">
+    <h2>保存したプラン（見比べ）</h2>
+    <div class="plangrid" id="plangrid"></div>
+    <p class="note" style="margin-top:14px" id="disc"></p>
+  </section>
+</div>
+
+<!-- 色選択 -->
+<div class="overlay" id="ovPick" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pickTitle">
+    <h3 id="pickTitle">色を選ぶ</h3>
+    <div class="pv">
+      <div class="big" id="pvBig"></div>
+      <div class="col">
+        <div class="line"><input type="text" id="pvHex" maxlength="7" aria-label="HEXカラー" placeholder="#RRGGBB">
+          <input type="color" id="pvNative" aria-label="カラーピッカー"></div>
+        <input type="text" id="pvCode" aria-label="日塗工の色番号" placeholder="日塗工の色番号（例 19-90B）">
+      </div>
+    </div>
+    <input class="search" id="search" type="search" placeholder="色番号・色名で探す（例：19-、N-80、グレー）">
+    <div class="lib" id="lib"></div>
+    <details>
+      <summary>日塗工の色を登録・取り込む</summary>
+      <p style="font-size:13px;color:var(--muted);margin:8px 0 0">上の色と色番号をそのまま登録できます。まとめて入れる場合は、「色番号 #HEX」の形で貼り付けてください（AIスタジオの色データもそのまま貼れます）。画面の色は目安です。登録する色は、見本帳の実物を見ながら確認してください。</p>
+      <div class="btns"><button class="btn small" id="regOne">この色を色番号つきで登録</button></div>
+      <textarea id="bulk" placeholder="19-90B #F2E6CE&#10;N-80 #CCCCCC"></textarea>
+      <div class="btns"><button class="btn small" id="regBulk">貼り付けた色を取り込む</button></div>
+    </details>
+    <div class="modalbar"><span style="font-size:13px;color:var(--muted)">選ぶとすぐ写真に反映されます</span>
+      <button class="btn primary" id="pickDone">決定</button></div>
+  </div>
+</div>
+
+<!-- プラン閲覧 -->
+<div class="overlay" id="ovView" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-label="保存したプラン">
+    <div class="viewgrid" id="viewgrid"></div>
+    <div class="modalbar">
+      <div class="btns" style="margin:0">
+        <button class="btn" id="vPrev">← 前</button>
+        <button class="btn" id="vNext">次 →</button>
+        <button class="btn" id="vTwo">2枚並べる</button>
+      </div>
+      <div class="btns" style="margin:0">
+        <button class="btn" id="vDel">このプランを削除</button>
+        <button class="btn primary" id="vClose">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 報告書 -->
+<div class="overlay" id="ovRep" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-label="報告書">
+    <img class="viewimg" id="repImg" alt="カラーシミュレーション報告書">
+    <p class="note" style="margin-top:10px" id="repNote">この画像をファイルに保存して、印刷やメール添付に使えます。</p>
+    <div class="modalbar"><span></span>
+      <div class="btns" style="margin:0">
+        <button class="btn" id="repSave">ファイルに保存</button>
+        <button class="btn primary" id="repClose">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+var DISCLAIMER = "画面上のイメージです。実際の仕上がり色は、モニターや光の条件で異なります。ご契約時は日塗工の色見本帳・塗り板で必ずご確認ください。";
+var MAXPX = 1400, MAXPARTS = 10, MAXPLANS = 12;
+var $ = function(id){ return document.getElementById(id); };
+
+/* ---------- ストレージ（失敗しても動く） ---------- */
+function lsGet(k, d){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+/* ---------- 色ユーティリティ ---------- */
+function clamp(v, a, b){ return v < a ? a : v > b ? b : v; }
+function hexToRgb(h){ var m = /^#?([0-9a-f]{6})$/i.exec(h || ""); if(!m) return [128,128,128];
+  var n = parseInt(m[1], 16); return [(n>>16)&255, (n>>8)&255, n&255]; }
+function normHex(h){ h = (h || "").trim(); if(h[0] !== "#") h = "#" + h;
+  if(/^#[0-9a-f]{3}$/i.test(h)) h = "#" + h[1]+h[1]+h[2]+h[2]+h[3]+h[3];
+  return /^#[0-9a-f]{6}$/i.test(h) ? h.toLowerCase() : null; }
+
+/* N系は無彩色なので、マンセル明度から計算した目安色にする */
+function nHex(n){
+  var V = n / 10;
+  var Y = (1.1914*V - 0.22533*V*V + 0.23352*Math.pow(V,3) - 0.020484*Math.pow(V,4) + 0.00081939*Math.pow(V,5)) / 100;
+  Y = clamp(Y, 0, 1);
+  var s = Y <= 0.0031308 ? 12.92*Y : 1.055*Math.pow(Y, 1/2.4) - 0.055;
+  var v = Math.round(clamp(s, 0, 1) * 255).toString(16).padStart(2, "0");
+  return "#" + v + v + v;
+}
+var N_SERIES = []; for(var n = 10; n <= 95; n += 5){ N_SERIES.push({code:"N-" + n, hex:nHex(n), name:"無彩色"}); }
+var BASIC = [
+  ["ホワイト","#f4f4f1"],["アイボリー","#ebe3cf"],["ベージュ","#d8c7a5"],["クリーム","#efe0b0"],
+  ["ライトグレー","#c9ccd0"],["グレー","#8d939a"],["チャコール","#4a4f55"],["ブラック","#22262b"],
+  ["ブラウン","#6d4c3a"],["レンガ","#a2503a"],["オリーブ","#7c7d4c"],["グリーン","#4a6b57"],
+  ["ブルーグレー","#7a8fa1"],["ネイビー","#2d3f5a"]
+].map(function(a){ return {code:"", name:a[0], hex:a[1]}; });
+
+/* ---------- 状態 ---------- */
+var W = 0, H = 0, orig = null, ops = [];
+var parts = [], activeId = null, nextId = 1;
+var cRes = $("cRes"), cOrig = $("cOrig"), rctx = cRes.getContext("2d"), octx = cOrig.getContext("2d");
+var lib = lsGet("hcs_lib", []);
+var plans = lsGet("hcs_plans", []);
+
+function newPart(name, hex){ var p = {id:nextId++, name:name, hex:hex, code:""}; parts.push(p); return p; }
+function loadParts(){
+  var saved = lsGet("hcs_parts", null);
+  if(saved && saved.length){ saved.forEach(function(s){ var p = newPart(s.name, s.hex); p.code = s.code || ""; }); }
+  else { newPart("外壁", "#d8cbb0"); newPart("屋根", "#475569"); newPart("付帯部", "#f4f4f1"); }
+  activeId = parts[0].id;
+}
+function saveParts(){ lsSet("hcs_parts", parts.map(function(p){ return {name:p.name, hex:p.hex, code:p.code}; })); }
+
+/* ---------- 画像の読み込み ---------- */
+function setImage(source, w, h){
+  var s = Math.min(1, MAXPX / Math.max(w, h));
+  W = Math.round(w * s); H = Math.round(h * s);
+  cRes.width = cOrig.width = W; cRes.height = cOrig.height = H;
+  rctx.drawImage(source, 0, 0, W, H);
+  orig = rctx.getImageData(0, 0, W, H);
+  octx.putImageData(orig, 0, 0);
+  ops = [];
+  render();
+}
+function loadFile(file){
+  if(!file) return;
+  var done = function(src, w, h){ setImage(src, w, h); toast("写真を読み込みました。塗りたい場所をタップしてください。"); };
+  if(window.createImageBitmap){
+    createImageBitmap(file, {imageOrientation:"from-image"}).then(function(b){ done(b, b.width, b.height); })
+      .catch(function(){ viaImg(); });
+  } else viaImg();
+  function viaImg(){
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function(){ done(img, img.naturalWidth, img.naturalHeight); URL.revokeObjectURL(url); };
+    img.onerror = function(){ toast("この写真は読み込めませんでした。別の写真をお試しください。"); };
+    img.src = url;
+  }
+}
+
+/* サンプルの家（写真が手元にないときの試用・動作確認用） */
+function drawSample(){
+  var c = document.createElement("canvas"); c.width = 1200; c.height = 800; var g = c.getContext("2d");
+  var sky = g.createLinearGradient(0,0,0,560); sky.addColorStop(0,"#b9d6ea"); sky.addColorStop(1,"#e9f1f6");
+  g.fillStyle = sky; g.fillRect(0,0,1200,800);
+  g.fillStyle = "#8aa07c"; g.fillRect(0,640,1200,160);
+  g.fillStyle = "#b9b6ae"; g.beginPath(); g.moveTo(520,800); g.lineTo(640,640); g.lineTo(760,640); g.lineTo(900,800); g.fill();
+  /* 外壁 */
+  var wall = g.createLinearGradient(250,0,950,0); wall.addColorStop(0,"#d6c9ae"); wall.addColorStop(1,"#c4b69a");
+  g.fillStyle = wall; g.fillRect(250,330,700,310);
+  g.fillStyle = "rgba(0,0,0,.06)"; for(var x = 250; x < 950; x += 14) g.fillRect(x,330,2,310);
+  /* 屋根 */
+  g.fillStyle = "#585d66"; g.beginPath(); g.moveTo(190,345); g.lineTo(600,160); g.lineTo(1010,345); g.closePath(); g.fill();
+  g.save(); g.beginPath(); g.moveTo(190,345); g.lineTo(600,160); g.lineTo(1010,345); g.closePath(); g.clip();
+  g.fillStyle = "rgba(0,0,0,.14)"; for(var y = 190; y < 340; y += 16) g.fillRect(190,y,820,3); g.restore();
+  /* 軒・帯（付帯部） */
+  g.fillStyle = "#f1f1ee"; g.fillRect(230,334,740,16); g.fillRect(250,486,700,14);
+  var sh = g.createLinearGradient(0,350,0,390); sh.addColorStop(0,"rgba(0,0,0,.28)"); sh.addColorStop(1,"rgba(0,0,0,0)");
+  g.fillStyle = sh; g.fillRect(250,350,700,40);
+  /* 窓 */
+  [[300,380],[520,380],[740,380],[300,530],[740,530]].forEach(function(p){
+    g.fillStyle = "#f1f1ee"; g.fillRect(p[0]-8,p[1]-8,136,96);
+    var gl = g.createLinearGradient(0,p[1],0,p[1]+80); gl.addColorStop(0,"#8fb0c6"); gl.addColorStop(1,"#c4d6e2");
+    g.fillStyle = gl; g.fillRect(p[0],p[1],120,80); g.fillStyle = "#f1f1ee"; g.fillRect(p[0]+58,p[1],4,80);
+  });
+  g.fillStyle = "#f1f1ee"; g.fillRect(512,528,116,112); g.fillStyle = "#6b4f3a"; g.fillRect(520,536,100,104);
+  g.fillStyle = "#e0d6c2"; g.fillRect(250,630,700,10);
+  setImage(c, 1200, 800);
+}
+
+/* ---------- 塗り処理 ---------- */
+function floodSelect(sx, sy, tol){
+  var d = orig.data, n = W * H, mask = new Uint8Array(n), vis = new Uint8Array(n);
+  var rs = [], gs = [], bs = [];
+  for(var dy = -2; dy <= 2; dy++) for(var dx = -2; dx <= 2; dx++){
+    var x = sx + dx, y = sy + dy; if(x < 0 || y < 0 || x >= W || y >= H) continue;
+    var i = (y * W + x) * 4; rs.push(d[i]); gs.push(d[i+1]); bs.push(d[i+2]);
+  }
+  var med = function(a){ a.sort(function(u, v){ return u - v; }); return a[a.length >> 1]; };
+  var r = med(rs), gg = med(gs), b = med(bs);
+  var tol2 = tol * tol, soft2 = (tol * 0.18) * (tol * 0.18), cap2 = (tol * 1.25) * (tol * 1.25);
+  var stack = new Int32Array(n), sp = 0, seed = sy * W + sx;
+  stack[sp++] = seed; vis[seed] = 1; mask[seed] = 1;
+  var nb = [-1, 1, -W, W];
+  while(sp){
+    var p = stack[--sp], px = p % W, pi = p * 4;
+    for(var k = 0; k < 4; k++){
+      if(k === 0 && px === 0) continue; if(k === 1 && px === W - 1) continue;
+      var q = p + nb[k]; if(q < 0 || q >= n || vis[q]) continue;
+      vis[q] = 1;
+      var qi = q * 4, er = d[qi]-r, eg = d[qi+1]-gg, eb = d[qi+2]-b, dr = er*er + eg*eg + eb*eb;
+      var ok = dr <= tol2;
+      if(!ok && dr <= cap2){ /* 日陰などのゆるやかな変化は、隣との差が小さければ許す */
+        var nr = d[qi]-d[pi], ng = d[qi+1]-d[pi+1], nbb = d[qi+2]-d[pi+2];
+        ok = (nr*nr + ng*ng + nbb*nbb) <= soft2;
+      }
+      if(ok){ mask[q] = 1; stack[sp++] = q; }
+    }
+  }
+  /* 小さな塗り残し（汚れ・ざらつき）を埋める */
+  var fixed = new Uint8Array(mask);
+  for(var y2 = 1; y2 < H - 1; y2++) for(var x2 = 1; x2 < W - 1; x2++){
+    var id = y2 * W + x2; if(mask[id]) continue;
+    var cnt = mask[id-1] + mask[id+1] + mask[id-W] + mask[id+W] + mask[id-W-1] + mask[id-W+1] + mask[id+W-1] + mask[id+W+1];
+    if(cnt >= 6) fixed[id] = 1;
+  }
+  /* 縁を1pxだけ半透明で足してなじませる */
+  var idx = [], al = [], sumL = 0, inside = 0;
+  for(var y3 = 0; y3 < H; y3++) for(var x3 = 0; x3 < W; x3++){
+    var j = y3 * W + x3;
+    if(fixed[j]){ idx.push(j); al.push(255); var o = j * 4; sumL += .299*d[o] + .587*d[o+1] + .114*d[o+2]; inside++; }
+    else if((x3 > 0 && fixed[j-1]) || (x3 < W-1 && fixed[j+1]) || (y3 > 0 && fixed[j-W]) || (y3 < H-1 && fixed[j+W])){
+      idx.push(j); al.push(140);
+    }
+  }
+  return {idx:Int32Array.from(idx), a:Uint8Array.from(al), meanL:Math.max(20, sumL / Math.max(1, inside)), size:inside};
+}
+function applyOp(out, op, rgb){
+  var d = orig.data, idx = op.idx, a = op.a, meanL = op.meanL;
+  for(var k = 0; k < idx.length; k++){
+    var o = idx[k] * 4, lum = .299*d[o] + .587*d[o+1] + .114*d[o+2];
+    var ratio = clamp(1 + (lum / meanL - 1) * 0.92, 0.3, 1.8), al = a[k] / 255;
+    for(var c = 0; c < 3; c++){
+      var v = clamp(rgb[c] * ratio, 0, 255);
+      out[o+c] = d[o+c] * (1 - al) + v * al;
+    }
+  }
+}
+function render(){
+  if(!orig) return;
+  var out = new ImageData(new Uint8ClampedArray(orig.data), W, H);
+  ops.forEach(function(op){ var p = byId(op.part); if(p) applyOp(out.data, op, hexToRgb(p.hex)); });
+  rctx.putImageData(out, 0, 0);
+  drawDots(); renderParts(); updateCmp();
+}
+function byId(id){ return parts.filter(function(p){ return p.id === id; })[0]; }
+function drawDots(){
+  var box = $("dots"); box.textContent = "";
+  ops.forEach(function(op, i){
+    var p = byId(op.part); if(!p) return;
+    var el = document.createElement("div"); el.className = "dot";
+    el.style.left = (op.sx / W * 100) + "%"; el.style.top = (op.sy / H * 100) + "%";
+    el.style.background = p.hex; el.textContent = String(parts.indexOf(p) + 1);
+    el.title = p.name + "：タップで取り消し";
+    el.addEventListener("click", function(e){ e.stopPropagation(); ops.splice(i, 1); render(); });
+    box.appendChild(el);
+  });
+}
+function updateCmp(){ var v = +$("cmp").value; cOrig.style.clipPath = "inset(0 " + (100 - v) + "% 0 0)"; }
+
+/* ---------- 写真をタップ ---------- */
+$("stagebox").addEventListener("click", function(e){
+  if(!orig) return;
+  var p = byId(activeId); if(!p) return;
+  if(ops.filter(function(o){ return o.part === activeId; }).length >= 10){ toast("1つの箇所に塗れるのは10か所までです。"); return; }
+  var rc = cRes.getBoundingClientRect();
+  var x = clamp(Math.floor((e.clientX - rc.left) / rc.width * W), 0, W - 1);
+  var y = clamp(Math.floor((e.clientY - rc.top) / rc.height * H), 0, H - 1);
+  var sel = floodSelect(x, y, +$("tol").value);
+  if(sel.size < 30){ toast("そこは小さすぎて選べませんでした。もう少し広い面をタップしてください。"); return; }
+  ops.push({part:activeId, sx:x, sy:y, idx:sel.idx, a:sel.a, meanL:sel.meanL});
+  if(+$("cmp").value !== 0){ $("cmp").value = 0; }
+  render();
+});
+$("undo").addEventListener("click", function(){ ops.pop(); render(); });
+$("reset").addEventListener("click", function(){ ops = []; render(); });
+$("cmp").addEventListener("input", updateCmp);
+$("tol").addEventListener("input", function(){});
+
+/* ---------- 箇所リスト ---------- */
+function renderParts(){
+  var box = $("parts"); box.textContent = "";
+  parts.forEach(function(p, i){
+    var row = document.createElement("div"); row.className = "row" + (p.id === activeId ? " active" : "");
+    var sw = document.createElement("button"); sw.className = "sw"; sw.style.background = p.hex;
+    sw.setAttribute("aria-label", p.name + "の色を選ぶ");
+    var num = document.createElement("span"); num.textContent = String(i + 1); sw.appendChild(num);
+    sw.addEventListener("click", function(e){ e.stopPropagation(); activeId = p.id; openPicker(p.id); });
+    var nm = document.createElement("div"); nm.className = "rowname";
+    var inp = document.createElement("input"); inp.value = p.name; inp.setAttribute("aria-label", "箇所の名前");
+    inp.addEventListener("click", function(e){ e.stopPropagation(); if(activeId !== p.id){ activeId = p.id; row.classList.add("active"); updateHint(); } });
+    inp.addEventListener("input", function(){ p.name = inp.value; saveParts(); updateHint(); });
+    var sm = document.createElement("small");
+    var cnt = ops.filter(function(o){ return o.part === p.id; }).length;
+    sm.textContent = (p.code ? "日塗工 " + p.code : "カスタム") + " " + p.hex + (cnt ? "　" + cnt + "か所塗り" : "");
+    nm.appendChild(inp); nm.appendChild(sm);
+    row.appendChild(sw); row.appendChild(nm);
+    if(parts.length > 1){
+      var x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", p.name + "を削除");
+      x.addEventListener("click", function(e){
+        e.stopPropagation();
+        ops = ops.filter(function(o){ return o.part !== p.id; });
+        parts.splice(i, 1); if(activeId === p.id) activeId = parts[0].id;
+        saveParts(); render();
+      });
+      row.appendChild(x);
+    }
+    row.addEventListener("click", function(){ activeId = p.id; renderParts(); });
+    box.appendChild(row);
+  });
+  $("addPart").disabled = parts.length >= MAXPARTS;
+  updateHint();
+}
+function updateHint(){
+  var p = byId(activeId);
+  $("hint").textContent = p ? "いま「" + p.name + "」を塗ります。写真の塗りたい場所をタップしてください。" : "";
+}
+$("addPart").addEventListener("click", function(){
+  if(parts.length >= MAXPARTS) return;
+  var k = parts.length - 2, p = newPart("アクセント" + k, "#8d939a"); activeId = p.id; saveParts(); renderParts();
+});
+
+/* ---------- 色選択 ---------- */
+var pickId = null;
+function openPicker(id){
+  pickId = id; var p = byId(id);
+  $("pickTitle").textContent = "「" + p.name + "」の色を選ぶ";
+  $("search").value = ""; syncPicker(); buildLib(); $("ovPick").hidden = false;
+}
+function syncPicker(){
+  var p = byId(pickId); if(!p) return;
+  $("pvBig").style.background = p.hex; $("pvHex").value = p.hex; $("pvNative").value = p.hex; $("pvCode").value = p.code;
+}
+function setColor(hex, code){
+  var p = byId(pickId); if(!p) return;
+  p.hex = hex; p.code = code || ""; saveParts(); syncPicker(); render();
+}
+function buildLib(){
+  var q = $("search").value.trim().toLowerCase(), box = $("lib"); box.textContent = "";
+  var groups = [["登録した日塗工色", lib], ["N系（無彩色・計算による目安）", N_SERIES], ["基本色", BASIC]];
+  var shown = 0;
+  groups.forEach(function(gr){
+    var items = gr[1].filter(function(c){ return !q || (c.code + " " + (c.name || "")).toLowerCase().indexOf(q) >= 0; }).slice(0, 300);
+    if(!items.length) return;
+    shown += items.length;
+    var h = document.createElement("h4"); h.textContent = gr[0]; box.appendChild(h);
+    var grid = document.createElement("div"); grid.className = "swgrid";
+    items.forEach(function(c){
+      var b = document.createElement("button"); b.className = "swb";
+      var i = document.createElement("i"); i.style.background = c.hex;
+      b.appendChild(i); b.appendChild(document.createTextNode(c.code || c.name));
+      b.addEventListener("click", function(){ setColor(c.hex, c.code); });
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+  });
+  if(!lib.length && !q){
+    var t = document.createElement("p"); t.style.cssText = "font-size:13px;color:var(--muted)";
+    t.textContent = "日塗工の色は、下の「登録・取り込む」から入れると、ここに並びます。";
+    box.insertBefore(t, box.firstChild);
+  }
+  if(!shown){ var e = document.createElement("p"); e.className = "empty"; e.textContent = "該当する色がありません。HEXで直接入力するか、登録してください。"; box.appendChild(e); }
+}
+$("search").addEventListener("input", buildLib);
+$("pvHex").addEventListener("input", function(){ var h = normHex($("pvHex").value); if(h && h.length === 7 && $("pvHex").value.length >= 6){ setColor(h, ""); } });
+$("pvNative").addEventListener("input", function(){ setColor($("pvNative").value, ""); });
+$("pvCode").addEventListener("input", function(){ var p = byId(pickId); if(p){ p.code = $("pvCode").value.trim(); saveParts(); renderParts(); } });
+$("pickDone").addEventListener("click", function(){ $("ovPick").hidden = true; render(); });
+$("ovPick").addEventListener("click", function(e){ if(e.target === $("ovPick")){ $("ovPick").hidden = true; } });
+function addLib(code, hex){
+  code = code.toUpperCase();
+  var ex = lib.filter(function(c){ return c.code === code; })[0];
+  if(ex){ ex.hex = hex; } else { lib.push({code:code, hex:hex, name:""}); }
+  lib.sort(function(a, b){ return a.code < b.code ? -1 : 1; });
+}
+$("regOne").addEventListener("click", function(){
+  var p = byId(pickId), code = $("pvCode").value.trim();
+  if(!p || !code){ toast("色番号を入れてから登録してください。"); return; }
+  addLib(code, p.hex); lsSet("hcs_lib", lib); p.code = code.toUpperCase(); saveParts(); syncPicker(); buildLib(); renderParts(); toast(code + " を登録しました。");
+});
+$("regBulk").addEventListener("click", function(){
+  var t = $("bulk").value, re = /(?<![0-9A-Za-z-])([0-9]{2}-[0-9]{2,3}[A-Z]?|N-[0-9]{2,3})(?![0-9A-Za-z-])/g, hits = [], m;
+  while((m = re.exec(t))){ hits.push({code:m[1], at:m.index + m[0].length}); }
+  var added = 0;
+  hits.forEach(function(h, i){
+    var end = i + 1 < hits.length ? hits[i+1].at - hits[i+1].code.length : t.length;
+    var hm = /#[0-9a-fA-F]{6}\b/.exec(t.slice(h.at, end));
+    if(hm){ addLib(h.code, hm[0].toLowerCase()); added++; }
+  });
+  if(added){ lsSet("hcs_lib", lib); $("bulk").value = ""; buildLib(); toast(added + "色を取り込みました。"); }
+  else toast("色番号とHEX（#RRGGBB）の組み合わせが見つかりませんでした。");
+});
+
+/* ---------- プラン保存・閲覧 ---------- */
+function thumbURL(){
+  var s = Math.min(1, 1000 / Math.max(W, H)), c = document.createElement("canvas");
+  c.width = Math.round(W * s); c.height = Math.round(H * s); c.getContext("2d").drawImage(cRes, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.8);
+}
+function partsSnapshot(){ return parts.map(function(p){ return {name:p.name, hex:p.hex, code:p.code}; }); }
+$("savePlan").addEventListener("click", function(){
+  if(!orig){ toast("先に写真を読み込んでください。"); return; }
+  if(!ops.length){ toast("まだ何も塗っていません。写真をタップして塗ってから保存してください。"); return; }
+  var name = $("planName").value.trim() || "プラン";
+  var plan = {id:Date.now(), name:name, img:thumbURL(), parts:partsSnapshot()};
+  plans.unshift(plan); plans = plans.slice(0, MAXPLANS);
+  if(!lsSet("hcs_plans", plans)){ plans.shift(); toast("保存の空きがありません。古いプランを削除してください。"); return; }
+  var m = /^(.*?)([A-Za-zＡ-Ｚ])$/.exec(name);
+  if(m) $("planName").value = m[1] + String.fromCharCode(m[2].charCodeAt(0) + 1);
+  renderPlans(); toast("「" + name + "」を保存しました。");
+});
+function renderPlans(){
+  var g = $("plangrid"); g.textContent = "";
+  if(!plans.length){
+    var e = document.createElement("p"); e.className = "empty";
+    e.textContent = "まだ保存したプランはありません。色を変えて「このプランを保存」を押すと、ここに並んで見比べられます。"; g.appendChild(e); return;
+  }
+  plans.forEach(function(pl, i){
+    var b = document.createElement("button"); b.className = "card plan";
+    var im = document.createElement("img"); im.src = pl.img; im.alt = pl.name;
+    var t = document.createElement("b"); t.textContent = pl.name;
+    var ch = document.createElement("div"); ch.className = "chips";
+    pl.parts.forEach(function(p){ var c = document.createElement("span"); c.className = "chip"; c.style.background = p.hex; c.title = p.name + " " + (p.code || p.hex); ch.appendChild(c); });
+    b.appendChild(im); b.appendChild(t); b.appendChild(ch);
+    b.addEventListener("click", function(){ openView(i); });
+    g.appendChild(b);
+  });
+}
+var vi = 0, vTwo = false;
+function openView(i){ vi = i; $("ovView").hidden = false; drawView(); }
+function drawView(){
+  var g = $("viewgrid"); g.textContent = "";
+  var list = vTwo && plans.length > 1 ? [plans[vi], plans[(vi + 1) % plans.length]] : [plans[vi]];
+  g.style.setProperty("--n", list.length);
+  list.forEach(function(pl){
+    var d = document.createElement("div");
+    var im = document.createElement("img"); im.className = "viewimg"; im.src = pl.img; im.alt = pl.name;
+    var t = document.createElement("b"); t.textContent = pl.name; t.style.display = "block"; t.style.marginTop = "6px";
+    var l = document.createElement("div"); l.style.cssText = "font-size:13px;color:var(--muted)";
+    pl.parts.forEach(function(p){
+      var s = document.createElement("span"); s.style.cssText = "display:inline-flex;gap:5px;align-items:center;margin:2px 12px 2px 0";
+      var c = document.createElement("span"); c.className = "chip"; c.style.background = p.hex;
+      s.appendChild(c); s.appendChild(document.createTextNode(p.name + " " + (p.code || p.hex))); l.appendChild(s);
+    });
+    d.appendChild(im); d.appendChild(t); d.appendChild(l); g.appendChild(d);
+  });
+  $("vTwo").textContent = vTwo ? "1枚で見る" : "2枚並べる";
+  $("vTwo").hidden = plans.length < 2; $("vPrev").hidden = $("vNext").hidden = plans.length < 2;
+}
+$("vPrev").addEventListener("click", function(){ vi = (vi - 1 + plans.length) % plans.length; drawView(); });
+$("vNext").addEventListener("click", function(){ vi = (vi + 1) % plans.length; drawView(); });
+$("vTwo").addEventListener("click", function(){ vTwo = !vTwo; drawView(); });
+$("vClose").addEventListener("click", function(){ $("ovView").hidden = true; });
+$("vDel").addEventListener("click", function(){
+  if(!this.dataset.sure){ this.dataset.sure = "1"; this.textContent = "本当に削除する"; var b = this; setTimeout(function(){ delete b.dataset.sure; b.textContent = "このプランを削除"; }, 3000); return; }
+  plans.splice(vi, 1); lsSet("hcs_plans", plans); this.dataset.sure = ""; this.textContent = "このプランを削除";
+  renderPlans(); if(!plans.length){ $("ovView").hidden = true; } else { vi = vi % plans.length; drawView(); }
+});
+document.addEventListener("keydown", function(e){
+  if(!$("ovView").hidden){ if(e.key === "ArrowRight") $("vNext").click(); if(e.key === "ArrowLeft") $("vPrev").click(); if(e.key === "Escape") $("vClose").click(); }
+  else if(e.key === "z" && (e.ctrlKey || e.metaKey)){ ops.pop(); render(); }
+});
+$("ovView").addEventListener("click", function(e){ if(e.target === $("ovView")) $("ovView").hidden = true; });
+
+/* ---------- 報告書（画像） ---------- */
+var reportBlob = null;
+function makeReport(){
+  var pw = 1800, pad = 60, colW = (pw - pad * 2 - 40) / 2, ar = H / W, imgH = Math.round(colW * ar);
+  var rows = parts.length, ph = pad + 110 + imgH + 70 + rows * 62 + 40 + 90 + pad;
+  var c = document.createElement("canvas"); c.width = pw; c.height = ph; var g = c.getContext("2d");
+  var font = '"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif';
+  g.fillStyle = "#fff"; g.fillRect(0, 0, pw, ph); g.fillStyle = "#1c2430"; g.textBaseline = "alphabetic";
+  g.font = "700 46px " + font; g.fillText("外壁塗装 カラーシミュレーション", pad, pad + 40);
+  var owner = $("owner").value.trim(), d = new Date();
+  g.font = "400 26px " + font; g.fillStyle = "#5e6875";
+  g.fillText((owner ? owner + "　" : "") + d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日", pad, pad + 86);
+  var y0 = pad + 110;
+  var before = document.createElement("canvas"); before.width = W; before.height = H; before.getContext("2d").putImageData(orig, 0, 0);
+  g.drawImage(before, pad, y0, colW, imgH); g.drawImage(cRes, pad + colW + 40, y0, colW, imgH);
+  g.fillStyle = "#1c2430"; g.font = "700 28px " + font;
+  g.fillText("現在", pad, y0 + imgH + 42); g.fillText("塗装後イメージ", pad + colW + 40, y0 + imgH + 42);
+  var y = y0 + imgH + 90;
+  parts.forEach(function(p){
+    g.fillStyle = p.hex; g.fillRect(pad, y, 80, 46); g.strokeStyle = "#0004"; g.lineWidth = 1.5; g.strokeRect(pad, y, 80, 46);
+    g.fillStyle = "#1c2430"; g.font = "700 28px " + font; g.fillText(p.name, pad + 110, y + 34);
+    g.font = "400 26px " + font; g.fillStyle = "#3a4452";
+    g.fillText((p.code ? "日塗工 " + p.code : "カスタム色") + "　" + p.hex, pad + 420, y + 34);
+    y += 62;
+  });
+  g.fillStyle = "#7a4a00"; g.font = "400 22px " + font;
+  var words = DISCLAIMER.split(""), line = "", yy = ph - pad - 30, maxw = pw - pad * 2, lines = [];
+  words.forEach(function(ch){ if(g.measureText(line + ch).width > maxw){ lines.push(line); line = ch; } else line += ch; });
+  lines.push(line); lines.forEach(function(l, i){ g.fillText(l, pad, yy + i * 30); });
+  return c;
+}
+$("report").addEventListener("click", function(){
+  if(!orig){ toast("先に写真を読み込んでください。"); return; }
+  if(!ops.length){ toast("まだ何も塗っていません。"); return; }
+  var c = makeReport();
+  $("repImg").src = c.toDataURL("image/png");
+  c.toBlob(function(b){ reportBlob = b; });
+  $("ovRep").hidden = false;
+  if(!dl) $("repNote").textContent = "この画面で画像を長押し（右クリック）して保存してください。印刷はその画像を印刷します。";
+});
+$("repClose").addEventListener("click", function(){ $("ovRep").hidden = true; });
+$("ovRep").addEventListener("click", function(e){ if(e.target === $("ovRep")) $("ovRep").hidden = true; });
+$("repSave").addEventListener("click", function(){
+  if(!dl){ toast("画像を長押し（右クリック）して保存してください。"); return; }
+  if(!reportBlob){ toast("もう一度お試しください。"); return; }
+  var d = new Date(), nm = "カラーシミュレーション_" + d.getFullYear() + ("0" + (d.getMonth()+1)).slice(-2) + ("0" + d.getDate()).slice(-2) + ".png";
+  dl.save({filename:nm, data:reportBlob}).then(function(){ toast("保存しました。"); })
+    .catch(function(e){ if(e && e.code !== "declined") toast("保存できませんでした。画像を長押しして保存してください。"); });
+});
+var dl = null;
+(function(){ try{ if(window.claude && window.claude.use){ window.claude.use("downloads").then(function(x){ dl = x; if(!x) $("repSave").hidden = true; }).catch(function(){ $("repSave").hidden = true; }); } else { $("repSave").hidden = true; } }catch(e){ $("repSave").hidden = true; } })();
+
+/* ---------- 共通 ---------- */
+var tt;
+function toast(msg){ var t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(function(){ t.hidden = true; }, 3400); }
+$("pick").addEventListener("click", function(){ $("file").click(); });
+$("file").addEventListener("change", function(){ loadFile($("file").files[0]); $("file").value = ""; });
+$("sample").addEventListener("click", drawSample);
+var stage = document.querySelector(".stage");
+stage.addEventListener("dragover", function(e){ e.preventDefault(); });
+stage.addEventListener("drop", function(e){ e.preventDefault(); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+$("owner").value = lsGet("hcs_owner", "");
+$("owner").addEventListener("input", function(){ lsSet("hcs_owner", $("owner").value); });
+$("disc").textContent = "【ご注意】" + DISCLAIMER;
+
+loadParts(); renderPlans(); drawSample();
+})();
+</script>
