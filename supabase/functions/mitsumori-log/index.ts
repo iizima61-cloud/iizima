@@ -13,8 +13,11 @@ const EVENTS = ["page_view", "file_selected", "score_shown", "form_start", "form
 // 1つのIPから短時間に大量に来たら断る（shashin-shindanと同じ、shindan_bump RPCによる1日あたりの上限方式）。
 // ※shashin-log自体には現在このIP制限が入っていないが、匿名で叩けるPOSTエンドポイントのため、
 //   同じプロジェクトに既にあるこの仕組みを使って新たに追加する。
+// shindan_usageのキーは全アプリで1つのテーブルを共有しているため、shashin-shindanが使う
+// "total" / "ip:<ハッシュ>" とは絶対に被らないよう、"mlog:" で始まるキーだけを使う
+// （これが被ると、見積診断の記録だけで写真診断の1日の上限が減ってしまう）。
 const DAILY_LIMIT = Number(Deno.env.get("MITSUMORI_DAILY_LIMIT") ?? "5000");
-const PER_IP_LIMIT = Number(Deno.env.get("MITSUMORI_PER_IP_LIMIT") ?? "300");
+const PER_IP_LIMIT = Number(Deno.env.get("MITSUMORI_PER_IP_LIMIT") ?? "200"); // 記録用のため控えめに
 
 function cors(origin: string | null) {
   const o = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
@@ -50,11 +53,12 @@ Deno.serve(async (req) => {
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  // 利用回数の上限（止まっていたら安全側で断る。写真診断アプリとは別カウンタのキーを使う）
+  // 利用回数の上限（止まっていたら安全側で断る。写真診断アプリ(shashin-shindan)とは
+  // 絶対に被らない "mlog:" プレフィックス付きのキーだけを使う）
   try {
     const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-    const ipKey = "mitsumori_ip:" + (await sha(ip + (Deno.env.get("IP_SALT") ?? "iizima")));
-    const total = await sb.rpc("shindan_bump", { p_key: "mitsumori_total" });
+    const ipKey = "mlog:ip:" + (await sha(ip + (Deno.env.get("IP_SALT") ?? "iizima")));
+    const total = await sb.rpc("shindan_bump", { p_key: "mlog:total" });
     if (total.error) throw total.error;
     if (total.data > DAILY_LIMIT) return json({ error: "busy" }, 429, origin);
     const mine = await sb.rpc("shindan_bump", { p_key: ipKey });
