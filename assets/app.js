@@ -10,8 +10,70 @@
    空欄のままなら「専門家に相談する」機能は表示されません。
 ==================================================================== */
 const CONFIG = {
-  sheetsWebhookUrl: 'https://script.google.com/macros/s/AKfycbw2TMFIKNnAE63OOmGeiQCglwSUH8yLt-NwkqeNc6JO_bl4x1FEgqOh4pbwSyCFSW2xzg/exec'
+  sheetsWebhookUrl: 'https://script.google.com/macros/s/AKfycbw2TMFIKNnAE63OOmGeiQCglwSUH8yLt-NwkqeNc6JO_bl4x1FEgqOh4pbwSyCFSW2xzg/exec',
+  // 広告からどこまで進んだかを数えるための記録先（写真診断アプリと同じSupabaseプロジェクト）。
+  // 個人情報・見積書の内容・金額・連絡先は送らない（種類・流入元・ランダムIDのみ）。
+  mitsumoriLogUrl: 'https://wglvspoifylzsnzzlrme.supabase.co/functions/v1/mitsumori-log',
+  mitsumoriAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndnbHZzcG9pZnlsenNuenpscm1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MTEzMzYsImV4cCI6MjEwMjA4NzMzNn0.28t8CB5po53b1QzlPPsDFN5NSWdh6SwEkWDpikWF4CE'
 };
+
+/* ==================== 利用状況の記録（広告の効果測定・離脱分析用） ====================
+   どこで離脱しているかを知るため、写真診断アプリ(shashin-log)と同じ考え方で、
+   「種類・流入元・ランダムID」だけを記録する。個人情報・見積書の内容・金額・
+   連絡先・IPアドレス・端末情報は一切送信・保存しない。
+   送信に失敗しても診断・フォームの動作には一切影響しない（投げっぱなしで無視する）。
+==================================================================== */
+const MITSUMORI_EVENTS_ONCE = ['page_view', 'file_selected', 'score_shown', 'form_start']; // セッション中1回だけ
+const mitsumoriTrackedOnce = {};
+function mitsumoriStorage(key, value) {
+  try {
+    if (value === undefined) return sessionStorage.getItem(key);
+    sessionStorage.setItem(key, value);
+  } catch (_) { /* sessionStorageが使えない環境は毎回判定でよい */ }
+  return null;
+}
+// 流入元の判定：?from=◯◯ → その値（文字ルールに合わなければ other）／gclidがあれば google_ads／どちらもなければ direct。
+// 1回決めたらセッション中は使い回す。
+function mitsumoriDetectSource() {
+  const cached = mitsumoriStorage('mitsumori_src');
+  if (cached) return cached;
+  let src = 'direct';
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const from = (q.get('from') || '').trim();
+    if (/^[A-Za-z0-9_-]{1,40}$/.test(from)) src = from;
+    else if (q.get('from')) src = 'other';
+    else if (q.get('gclid')) src = 'google_ads';
+  } catch (_) { /* URL解析に失敗したらdirect扱い */ }
+  mitsumoriStorage('mitsumori_src', src);
+  return src;
+}
+function mitsumoriSessionId() {
+  let id = mitsumoriStorage('mitsumori_sid');
+  if (!id) {
+    try { id = crypto.randomUUID(); }
+    catch (_) { id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12); }
+    mitsumoriStorage('mitsumori_sid', id);
+  }
+  return id;
+}
+const MITSUMORI_SOURCE = mitsumoriDetectSource();
+const MITSUMORI_SID = mitsumoriSessionId();
+function track(event) {
+  if (MITSUMORI_EVENTS_ONCE.includes(event)) {
+    if (mitsumoriTrackedOnce[event] || mitsumoriStorage('mitsumori_ev_' + event)) return;
+    mitsumoriTrackedOnce[event] = true;
+    mitsumoriStorage('mitsumori_ev_' + event, '1');
+  }
+  try {
+    fetch(CONFIG.mitsumoriLogUrl, {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.mitsumoriAnonKey, 'apikey': CONFIG.mitsumoriAnonKey },
+      body: JSON.stringify({ event, source: MITSUMORI_SOURCE, session_id: MITSUMORI_SID })
+    }).catch(() => {});
+  } catch (_) { /* 送信に失敗してもアプリの動作は止めない */ }
+}
 
 const SQM_PER_TSUBO = 3.30578;
 const HISTORY_KEY = 'iizima_diagnosis_history_v1';
@@ -366,6 +428,7 @@ async function extractTextFromFiles(files, baseIds) {
 let scanBusy = false;
 
 async function handleFiles(fileList) {
+  track('file_selected');
   if (scanBusy) { showScanNotice('読み込み中です。終わるまでお待ちください。'); return; }
   const { files, notices } = pickUploadFiles(fileList);
   if (!files.length) { showScanNotice('画像（JPG/PNG）またはPDFファイルを選択してください。'); return; }
@@ -545,6 +608,7 @@ function scrollToDiagForm() {
 function analyzePastedText() {
   const raw = document.getElementById('paste-text').value;
   if (!raw.trim()) { alert('文章を貼り付けてください。'); return; }
+  track('file_selected');
   const normalized = normalizeText(raw);
   const data = analyzeText(normalized);
   applyExtractedData(data, extractRoofPaintInfo(normalized));
@@ -1287,6 +1351,7 @@ function calculateDiagnostic(e) {
   scoreBadge.innerText = score + '点';
   gaugeMarker.style.left = score + '%';
   resultArea.style.display = 'block';
+  track('score_shown');
   document.getElementById('score-meaning').textContent = `${score}点 - ${getScoreMeaning(score)}`;
 
   // 価格判定が「適正」「判断材料不足」以外（やや安め・やや高め・安すぎる等）の場合は、
@@ -1643,6 +1708,7 @@ function runCompare() {
   document.getElementById('compare-table-wrap').innerHTML = linkifyGlossary(html);
   const resultArea = document.getElementById('compare-result-area');
   resultArea.style.display = 'block';
+  track('score_shown');
   resultArea.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -1843,6 +1909,7 @@ function setupLeadCard(diagnosis) {
       if (!res.ok || !reply || reply.result !== 'ok') throw new Error('受信を確認できませんでした');
       showLeadMessage('✅ 送信しました。担当者よりご連絡いたします。', false);
       form.reset();
+      track('form_sent');
       if (typeof gtag === 'function') {
         gtag('event', 'conversion', {'send_to': 'AW-18391141487/3zPyCIOl0vEcEO-YysFE'});
       }
@@ -1979,6 +2046,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cta-check-btn').addEventListener('click', () => {
     document.getElementById('drop-zone').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
+
+  // ---- 利用状況の記録（広告の効果測定・離脱分析用） ----
+  track('page_view');
+  document.getElementById('lead-form').addEventListener('focusin', () => track('form_start'), { once: true });
+  const leadLineLink = document.getElementById('lead-line-link');
+  if (leadLineLink) leadLineLink.addEventListener('click', () => track('line_click'));
 
   // ---- フェーズ3: 共有リンク（?share=...）からの読み込み ----
   // 共有された内容がある場合はそちらを優先し、無ければ今まで通りの初期値（サンプル用チェック）を入れる。
