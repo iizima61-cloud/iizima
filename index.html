@@ -142,7 +142,8 @@
   }
   nav.main-nav ul{
     display:flex;
-    gap:28px;
+    gap:20px;
+    flex-wrap:nowrap;
   }
   nav.main-nav a{
     font-size:14.5px;
@@ -152,6 +153,7 @@
     padding:6px 0;
     border-bottom:2px solid transparent;
     transition:.2s;
+    white-space:nowrap;
   }
   nav.main-nav a:hover{color:var(--blue);border-color:var(--blue);}
   .header-cta{
@@ -302,6 +304,56 @@
     display:flex;
     align-items:center;
     gap:8px;
+  }
+
+  /* ===== Diagnostic tools ===== */
+  .tools-section{background:var(--white);}
+  .tool-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:24px;
+  }
+  .tool-card{
+    display:flex;
+    flex-direction:column;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:32px 28px;
+    text-decoration:none;
+    color:inherit;
+    transition:.2s;
+  }
+  .tool-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px);border-color:var(--sky);}
+  .tool-card .tool-icon{
+    width:56px;height:56px;
+    border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px;
+    background:var(--blue-light);
+    margin-bottom:18px;
+  }
+  .tool-card.photo .tool-icon{background:#e3f2e9;}
+  .tool-card .tool-tag{
+    font-size:12px;
+    font-weight:700;
+    color:var(--blue);
+    margin-bottom:8px;
+  }
+  .tool-card h3{font-size:19px;color:var(--navy);font-weight:700;margin-bottom:10px;}
+  .tool-card p{font-size:14px;color:var(--ink-soft);margin-bottom:20px;flex:1;}
+  .tool-card .tool-cta{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-weight:700;
+    font-size:14.5px;
+    color:var(--accent);
+  }
+  .tool-card .tool-note{
+    margin-top:14px;
+    font-size:12px;
+    color:var(--ink-soft);
   }
 
   /* ===== Reasons chosen ===== */
@@ -764,6 +816,9 @@
   .mobile-action-bar a.bar-quote{background:var(--accent);}
 
   /* ===== Responsive ===== */
+  @media (max-width:1280px){
+    .header-cta a.tel-cta{display:none;}
+  }
   @media (max-width:960px){
     nav.main-nav{display:none;}
     .header-cta a.tel-cta{display:none;}
@@ -774,7 +829,7 @@
   }
   @media (max-width:640px){
     section{padding:52px 0;}
-    .card-grid-3,.case-grid,.area-grid{grid-template-columns:1fr;}
+    .card-grid-3,.case-grid,.area-grid,.tool-grid{grid-template-columns:1fr;}
     .top-bar .tel-group{gap:10px;}
     .company-table th{width:110px;}
     .form-wrap{padding:28px 20px;}
@@ -828,6 +883,7 @@
     </a>
     <nav class="main-nav">
       <ul>
+        <li><a href="#tools">診断ツール</a></li>
         <li><a href="#reasons">選ばれる理由</a></li>
         <li><a href="#audience">こんな方へ</a></li>
         <li><a href="#cases">施工事例</a></li>
@@ -848,6 +904,7 @@
   </div>
   <nav class="mobile-nav" id="mobileNav">
     <ul>
+      <li><a href="#tools">診断ツール</a></li>
       <li><a href="#reasons">選ばれる理由</a></li>
       <li><a href="#audience">こんな方へ</a></li>
       <li><a href="#cases">施工事例</a></li>
@@ -889,6 +946,34 @@
           <div class="hero-stat"><strong>戸建〜工場</strong><span>幅広い施工対応</span></div>
           <div class="hero-stat"><strong>第26237号</strong><span>建設業許可(防水工事業)</span></div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 無料診断ツール ===== -->
+  <section id="tools" class="tools-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">FREE TOOLS</div>
+        <h2 class="section-title">無料診断ツール</h2>
+        <p class="section-lead">スマホで撮るだけ、見積書をアップロードするだけ。どちらも無料・連絡先の入力なしでご利用いただけます。</p>
+      </div>
+      <div class="tool-grid">
+        <a href="https://iizima61-cloud.github.io/shashin/" target="_blank" rel="noopener" class="tool-card photo">
+          <div class="tool-icon">📷</div>
+          <div class="tool-tag">写真診断</div>
+          <h3>写真でわかる外壁・防水診断</h3>
+          <p>気になる外壁や屋根、ベランダ・屋上の防水をスマホで撮るだけ。防水専門店の目線で劣化の目安がすぐにわかります。</p>
+          <span class="tool-cta">写真診断をはじめる →</span>
+          <span class="tool-note">※外部サイトが開きます</span>
+        </a>
+        <a href="mitsumori-shindan.html" class="tool-card">
+          <div class="tool-icon">📄</div>
+          <div class="tool-tag">見積診断</div>
+          <h3>見積もり適正診断</h3>
+          <p>お手元の外壁塗装・防水工事の見積書をアップロードすると、価格や工事内容が適正かどうかの目安をチェックできます。</p>
+          <span class="tool-cta">見積診断をはじめる →</span>
+        </a>
       </div>
     </div>
   </section>
@@ -1233,6 +1318,7 @@
         <div>対応エリア：長野市・千曲市・埴科郡 ほか長野県内</div>
       </div>
       <div class="foot-links">
+        <a href="#tools">診断ツール</a>
         <a href="#reasons">選ばれる理由</a>
         <a href="#audience">こんな方へ</a>
         <a href="#cases">施工事例</a>
