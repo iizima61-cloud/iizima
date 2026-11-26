@@ -276,3 +276,20 @@ footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 16px
 
 /* ==================== フェーズ3: 診断履歴の追加表示 ==================== */
 .history-sub2 { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
+/* ---- 見積書がない方の入口・LINE/電話の常時表示（2026-11） ---- */
+.no-quote-box { background:#fffaf0; border:1px solid #f6e05e; border-radius:12px; padding:14px 16px; margin:14px 0; font-size:13px; color:#4a5568; }
+.no-quote-box b { font-size:14px; color:#1a202c; }
+.no-quote-box p { margin:6px 0 10px; line-height:1.6; }
+.no-quote-btn { width:100%; }
+.contact-strip { background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin:14px 0; }
+.contact-strip-lead { margin:0 0 8px; font-size:12px; color:var(--sub); text-align:center; line-height:1.6; }
+.contact-btns { display:flex; gap:8px; }
+.contact-btn { flex:1; display:flex; align-items:center; justify-content:center; min-height:48px; border-radius:10px; font-weight:bold; font-size:15px; text-decoration:none; }
+.contact-btn.line { background:#06c755; color:#fff; }
+.contact-btn.tel { background:#fff; color:var(--blue); border:2px solid var(--blue); }
+.diag-error { display:none; background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger); border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:6px; }
+.diag-error.show { display:block; }
+.score-box.market { background:#f0f7ff; border:2px solid #90cdf4; }
+.score-box.market .score-badge { font-size:30px; }
+#result-area.market-only .diag-only { display:none !important; }

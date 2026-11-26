@@ -21,8 +21,12 @@ function doPost(e) {
     sheet.appendRow([
       '受信日時', 'お名前', '電話番号/メール', 'スコア', '判定',
       '見積提示額(万円)', '適正相場(万円)', '工事内容', '相談内容', 'ご質問・ご要望',
-      '屋根塗装用メーカー', '屋根塗装用商品名'
+      '屋根塗装用メーカー', '屋根塗装用商品名', '外壁塗装用メーカー', '外壁塗装用商品名'
     ]);
+  }
+  // 以前から使っているシートには「外壁塗装用」の見出しが無いので、右端に足す（既存の列はずらさない）。
+  if (sheet.getRange(1, 13).getValue() === '') {
+    sheet.getRange(1, 13, 1, 2).setValues([['外壁塗装用メーカー', '外壁塗装用商品名']]);
   }
 
   var data = JSON.parse(e.postData.contents);
@@ -32,14 +36,16 @@ function doPost(e) {
     data.name || '',
     data.contact || '',
     data.score || '',
-    data.level || '',
-    data.priceMan || '',
+    data.level === 'market' ? '相場確認（見積書なし）' : (data.level || ''),
+    data.priceMan || '見積書なし',
     (data.expectedMin || '') + '〜' + (data.expectedMax || ''),
     data.scopeSummary || '',
     (data.topics && data.topics.length) ? data.topics.join('、') : '',
     data.memo || '',
     data.roofManufacturer || '',
-    data.roofProduct || ''
+    data.roofProduct || '',
+    data.manufacturer || '',
+    data.product || ''
   ]);
 
   if (NOTIFY_EMAIL) {
@@ -55,6 +61,11 @@ function sendNotifyEmail(data) {
   var subject = '【iizima診断アプリ】新しい相談が届きました（' + (data.name || '名前未入力') + '様）';
 
   // 屋根塗装用のメーカー・商品名は、どちらも記載がない場合は行ごと省略する。
+  var wallPaintLine = '';
+  if (data.manufacturer || data.product) {
+    wallPaintLine = '外壁塗装塗料　：' + (data.manufacturer || '（メーカー不明）') +
+      (data.product ? '　' + data.product : '') + '\n';
+  }
   var roofPaintLine = '';
   if (data.roofManufacturer || data.roofProduct) {
     roofPaintLine = '屋根塗装塗料　：' + (data.roofManufacturer || '（メーカー不明）') +
@@ -67,10 +78,11 @@ function sendNotifyEmail(data) {
     '連絡先　　　：' + (data.contact || '') + '\n' +
     '相談内容　　：' + ((data.topics && data.topics.length) ? data.topics.join('、') : '（なし）') + '\n' +
     'ご質問・要望：' + (data.memo || '（なし）') + '\n\n' +
-    '診断スコア　：' + (data.score || '') + '点\n' +
+    '診断スコア　：' + (data.level === 'market' ? '（見積書なし・相場確認のみ）' : (data.score || '') + '点') + '\n' +
     '工事内容　　：' + (data.scopeSummary || '') + '\n' +
+    wallPaintLine +
     roofPaintLine +
-    '見積提示額　：' + (data.priceMan || '') + '万円\n' +
+    '見積提示額　：' + (data.priceMan ? data.priceMan + '万円' : '見積書なし') + '\n' +
     '適正相場　　：' + (data.expectedMin || '') + '〜' + (data.expectedMax || '') + '万円\n\n' +
     '詳細はスプレッドシートの「診断依頼」シートをご確認ください。';
 
