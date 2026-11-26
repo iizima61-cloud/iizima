@@ -117,18 +117,25 @@ function getWaterproofAreaSurchargeMultiplier(areaSqm) {
 // 自社の過去請求書実績（軒天700〜1,500円/㎡、破風板750〜1,300円/m、
 // 雨樋800〜1,100円/m、水切り400円/mなど）を坪あたりに換算した実績値（3,000〜7,000円/坪）を採用する。
 const ATTACHED_RATE_PER_TSUBO = { min: 3000, max: 7000 };
+// 外壁塗装がある場合は、外壁面積（坪）あたりで付帯部を見る。
+// 自社見積2件（2026-01 平屋・シリコン：外壁80.65㎡で付帯部15.9万円／2026-04 フッ素：外壁298㎡で58.2万円）が
+// どちらも外壁1坪あたり約6,500円だったため、その前後を採用。
+const ATTACHED_RATE_PER_WALL_TSUBO = { min: 4500, max: 7500 };
+
+// 単価はすべて税抜き。お客様が入力する「合計金額」は税込みなので、相場にも消費税を掛けてから比べる。
+const TAX_MULTIPLIER = 1.1;
 
 // 外壁・屋根塗装に通常必要な「足場・高圧洗浄・シーリング」の目安。
 // 以前はこれらが相場に入っておらず、足場込みの普通の見積もりでも「やや高め」と出ていた。
 // 足場・シーリング単価は飯島防水の実勢（2026-11 史郎さん確認）。洗浄単価と各係数は仮。
-const SCAFFOLD_AREA_FACTOR = 1.2;                  // 足場の面積 ≒ 塗装面積 × 1.2（仮）
+const SCAFFOLD_AREA_FACTOR = 1.5;                  // 足場の面積 ≒ 外壁面積 × 1.5（自社見積：外壁298㎡に足場447㎡）
 const SCAFFOLD_RATE = { min: 800, max: 1200 };     // 足場 1㎡あたり（円・自社実勢）
-const WASH_RATE = { min: 150, max: 300 };          // 高圧洗浄 塗装面積1㎡あたり（円・仮）
+const WASH_RATE = { min: 250, max: 350 };          // 高圧洗浄 塗装面積1㎡あたり（円・自社見積：外壁300／屋根ケレン込み350）
 const SEALING_RATE_PER_M = { min: 1000, max: 1800 }; // シーリング 1mあたり（円・自社実勢：増し打ち約1,000／打ち替え1,200〜1,800）
 // 外壁1㎡あたりのシーリング長さ（m・仮）。サイディングは目地が多く、モルタルはサッシまわり程度。
 const SEALING_M_PER_WALL_SQM = {
   siding:  { min: 1.0, max: 1.5 },
-  mortar:  { min: 0.2, max: 0.4 },
+  mortar:  { min: 0, max: 0.3 },   // モルタルはシーリングが無い見積もりも多い（自社見積2件とも無し）
   alc:     { min: 1.5, max: 2.0 },  // ALCはパネル幅60cmで目地が多い（仮）
   unknown: { min: 0.2, max: 1.5 }
 };
@@ -255,7 +262,7 @@ function loadSample(type) {
   } else if (type === 'good') {
     document.getElementById('area-wall').value = 125;
     document.getElementById('area-rooftop').value = 40;
-    document.getElementById('total-price').value = 145;
+    document.getElementById('total-price').value = 170;
     document.getElementById('paint-grade').value = 'fluorine';
     document.getElementById('discount-amount').value = 3;
     setChecks(false, false, false, false, false, false);
@@ -1018,7 +1025,7 @@ function getPriceJudgement(price, expectedMinMan, expectedMaxMan) {
     return { icon: '⚪', label: '判断材料不足', tone: 'neutral' };
   }
   if (price < expectedMinMan * 0.75) return { icon: '🔴', label: '安すぎる可能性', tone: 'danger' };
-  if (price < expectedMinMan) return { icon: '🟡', label: 'やや安め', tone: 'warn' };
+  if (price < expectedMinMan * 0.9) return { icon: '🟡', label: 'やや安め', tone: 'warn' };
   if (price <= expectedMaxMan * 1.15) return { icon: '🟢', label: 'おおむね妥当', tone: 'good' };
   return { icon: '🟡', label: 'やや高め', tone: 'warn' };
 }
@@ -1367,9 +1374,15 @@ function calculateDiagnostic(e) {
   let attachedMin = 0, attachedMax = 0;
   if (paintActive) {
     const paintArea = (wallOn ? areaWall : 0) + (roofOn ? areaRoof : 0);
-    const attachedTsubo = paintArea / SQM_PER_TSUBO;
-    attachedMin = attachedTsubo * ATTACHED_RATE_PER_TSUBO.min;
-    attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
+    if (wallOn) {
+      const wallTsubo = areaWall / SQM_PER_TSUBO;
+      attachedMin = wallTsubo * ATTACHED_RATE_PER_WALL_TSUBO.min;
+      attachedMax = wallTsubo * ATTACHED_RATE_PER_WALL_TSUBO.max;
+    } else {
+      const attachedTsubo = paintArea / SQM_PER_TSUBO;
+      attachedMin = attachedTsubo * ATTACHED_RATE_PER_TSUBO.min;
+      attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
+    }
     // 足場（外壁があれば外壁面積、屋根だけなら屋根面積を基準）・高圧洗浄・シーリング（外壁のみ）
     const scaffoldArea = (wallOn ? areaWall : areaRoof) * SCAFFOLD_AREA_FACTOR;
     const sealingRate = getSealingRatePerWallSqm(document.getElementById('wall-type').value);
@@ -1381,7 +1394,7 @@ function calculateDiagnostic(e) {
   // という矛盾が起きるため、判定にも必ずこの値を使うこと。
   // 各項目の「安い側」「高い側」を全部足すと幅が広くなりすぎるため、両端を少し削った
   // 「よくある価格帯」を相場として表示・判定に使う（RANGE_TRIM 参照）。
-  const rawMin = expectedMin + attachedMin, rawMax = expectedMax + attachedMax;
+  const rawMin = (expectedMin + attachedMin) * TAX_MULTIPLIER, rawMax = (expectedMax + attachedMax) * TAX_MULTIPLIER;
   const span = rawMax - rawMin;
   const displayMinMan = Math.round((rawMin + span * RANGE_TRIM) / 1000) / 10;
   const displayMaxMan = Math.round((rawMax - span * RANGE_TRIM) / 1000) / 10;
@@ -1514,7 +1527,7 @@ function calculateDiagnostic(e) {
     if (waterActive && insulation === 'insulated') waterproofNotes.push('断熱材ありの単価で計算');
     if (waterActive && waterproofSurchargeApplied) waterproofNotes.push('施工面積が小さいため割増しを含む');
     const waterproofNote = waterproofNotes.length ? `、${waterproofNotes.join('・')}` : '';
-    priceCompare.innerText = `適正相場の目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（今回の入力条件に基づく概算${attachedNote}${waterproofNote}）`;
+    priceCompare.innerText = `適正相場の目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（税込・今回の入力条件に基づく概算${attachedNote}${waterproofNote}）`;
   } else {
     priceCompare.innerText = '';
   }
