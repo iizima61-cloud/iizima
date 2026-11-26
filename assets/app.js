@@ -771,7 +771,7 @@ function analyzeText(text) {
   if (/モルタル|リシン|吹付|吹き付け/.test(text)) found.push('mortar');
   if (/ALC|ＡＬＣ|ヘーベル|軽量気泡コンクリート/i.test(text)) found.push('alc');
   result.wallType = found.length === 1 ? found[0] : '';
-  result.isHiraya = /平屋|脚立足場/.test(text);
+  result.floors = /脚立足場/.test(text) ? 'hiraya_ladder' : (/平屋/.test(text) ? 'hiraya' : '');
   // ---- 保証 ----
   result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
   result.warrantyYears = null;
@@ -949,9 +949,11 @@ function applyExtractedData(d, roofInfo) {
     if (d.hasDrainKeyword) reportLines.push(`🚿 防水工事に必要な「改修ドレン」についての記載を確認できました。`);
   }
 
-  if (d.isHiraya) {
-    document.getElementById('building-floors').value = 'hiraya';
-    reportLines.push(`🏠 「平屋」または「脚立足場」の記載があったため、平屋として計算します（違う場合は「建物の階数」を直してください）。`);
+  if (d.floors) {
+    document.getElementById('building-floors').value = d.floors;
+    reportLines.push(d.floors === 'hiraya_ladder'
+      ? `🏠 「脚立足場」の記載があったため、平屋（仮設足場なし）として計算します（違う場合は「建物の階数と足場」を直してください）。`
+      : `🏠 「平屋」の記載があったため、平屋（仮設足場を組む）として計算します（違う場合は「建物の階数と足場」を直してください）。`);
   }
   if (d.wallType) {
     document.getElementById('wall-type').value = d.wallType;
@@ -1280,7 +1282,11 @@ function showMarketOnly(ctx) {
 
   const scopeParts = [];
   if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
-  if (paintActive && document.getElementById('building-floors').value === 'hiraya') scopeParts.push('平屋');
+  if (paintActive) {
+    const fl = document.getElementById('building-floors').value;
+    if (fl === 'hiraya') scopeParts.push('平屋・仮設足場');
+    if (fl === 'hiraya_ladder') scopeParts.push('平屋・脚立足場');
+  }
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -1395,7 +1401,8 @@ function calculateDiagnostic(e) {
       attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
     }
     // 足場（外壁があれば外壁面積、屋根だけなら屋根面積を基準）・高圧洗浄・シーリング（外壁のみ）
-    const isHiraya = document.getElementById('building-floors').value === 'hiraya';
+    // 平屋でも現場によっては仮設足場が必要。脚立足場で済む場合だけ一式で計算する。
+    const isHiraya = document.getElementById('building-floors').value === 'hiraya_ladder';
     const scaffoldArea = (wallOn ? areaWall : areaRoof) * SCAFFOLD_AREA_FACTOR;
     const scaffoldMin = isHiraya ? HIRAYA_SCAFFOLD_LUMP.min : scaffoldArea * SCAFFOLD_RATE.min;
     const scaffoldMax = isHiraya ? HIRAYA_SCAFFOLD_LUMP.max : scaffoldArea * SCAFFOLD_RATE.max;
@@ -1615,7 +1622,11 @@ function calculateDiagnostic(e) {
   // ---- 工事範囲サマリー（履歴・相談送信で使う） ----
   const scopeParts = [];
   if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
-  if (paintActive && document.getElementById('building-floors').value === 'hiraya') scopeParts.push('平屋');
+  if (paintActive) {
+    const fl = document.getElementById('building-floors').value;
+    if (fl === 'hiraya') scopeParts.push('平屋・仮設足場');
+    if (fl === 'hiraya_ladder') scopeParts.push('平屋・脚立足場');
+  }
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -2154,7 +2165,7 @@ function applySharedStateFromUrl() {
     document.getElementById('waterproof-method').value = state.method;
     document.getElementById('waterproof-insulation').value = state.ins || 'none';
     document.getElementById('wall-type').value = WALL_TYPE_LABELS[state.wt] ? state.wt : 'siding';
-    document.getElementById('building-floors').value = state.fl === 'hiraya' ? 'hiraya' : 'multi';
+    document.getElementById('building-floors').value = ['hiraya', 'hiraya_ladder'].includes(state.fl) ? state.fl : 'multi';
     document.getElementById('discount-amount').value = state.disc;
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
