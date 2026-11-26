@@ -118,6 +118,25 @@ function getWaterproofAreaSurchargeMultiplier(areaSqm) {
 // 雨樋800〜1,100円/m、水切り400円/mなど）を坪あたりに換算した実績値（3,000〜7,000円/坪）を採用する。
 const ATTACHED_RATE_PER_TSUBO = { min: 3000, max: 7000 };
 
+// 外壁・屋根塗装に通常必要な「足場・高圧洗浄・シーリング」の目安。
+// 以前はこれらが相場に入っておらず、足場込みの普通の見積もりでも「やや高め」と出ていた。
+// 足場・シーリング単価は飯島防水の実勢（2026-11 史郎さん確認）。洗浄単価と各係数は仮。
+const SCAFFOLD_AREA_FACTOR = 1.2;                  // 足場の面積 ≒ 塗装面積 × 1.2（仮）
+const SCAFFOLD_RATE = { min: 800, max: 1200 };     // 足場 1㎡あたり（円・自社実勢）
+const WASH_RATE = { min: 150, max: 300 };          // 高圧洗浄 塗装面積1㎡あたり（円・仮）
+const SEALING_RATE_PER_M = { min: 1000, max: 1800 }; // シーリング 1mあたり（円・自社実勢：増し打ち約1,000／打ち替え1,200〜1,800）
+// 外壁1㎡あたりのシーリング長さ（m・仮）。サイディングは目地が多く、モルタルはサッシまわり程度。
+const SEALING_M_PER_WALL_SQM = {
+  siding:  { min: 1.0, max: 1.5 },
+  mortar:  { min: 0.2, max: 0.4 },
+  unknown: { min: 0.2, max: 1.5 }
+};
+const WALL_TYPE_LABELS = { siding: 'サイディング', mortar: 'モルタル' };
+function getSealingRatePerWallSqm(wallType) {
+  const m = SEALING_M_PER_WALL_SQM[wallType] || SEALING_M_PER_WALL_SQM.unknown;
+  return { min: SEALING_RATE_PER_M.min * m.min, max: SEALING_RATE_PER_M.max * m.max };
+}
+
 const MANUFACTURER_KEYWORDS = [
   "日本ペイント","関西ペイント","エスケー化研","SK化研","アステックペイント","アステック",
   "プレマテックス","日進産業","ガイナ","大日本塗料","水谷ペイント","水谷","菊水化学工業","菊水化学","キクスイ","アトミクス",
@@ -204,7 +223,7 @@ function onAreaChange() {
 }
 function updateTsuboHint(inputId, hintId) {
   const v = parseFloat(document.getElementById(inputId).value) || 0;
-  document.getElementById(hintId).innerText = `（約${(v / SQM_PER_TSUBO).toFixed(1)}坪）`;
+  document.getElementById(hintId).innerText = v > 0 ? `（約${(v / SQM_PER_TSUBO).toFixed(1)}坪）` : '';
 }
 
 /* ==================== サンプルデータ ==================== */
@@ -217,7 +236,7 @@ function loadSample(type) {
   if (type === 'danger') {
     document.getElementById('area-wall').value = 130;
     document.getElementById('area-rooftop').value = 45;
-    document.getElementById('total-price').value = 210;
+    document.getElementById('total-price').value = 250;
     document.getElementById('paint-grade').value = 'silicon';
     document.getElementById('discount-amount').value = 40;
     setChecks(true, true, true, true, true, false);
@@ -231,7 +250,7 @@ function loadSample(type) {
   } else if (type === 'good') {
     document.getElementById('area-wall').value = 125;
     document.getElementById('area-rooftop').value = 40;
-    document.getElementById('total-price').value = 100;
+    document.getElementById('total-price').value = 145;
     document.getElementById('paint-grade').value = 'fluorine';
     document.getElementById('discount-amount').value = 3;
     setChecks(false, false, false, false, false, false);
@@ -244,6 +263,7 @@ function loadSample(type) {
   document.getElementById('roof-paint-manufacturer').value = '';
   document.getElementById('roof-paint-product').value = '';
   document.getElementById('waterproof-insulation').value = 'none';
+  document.getElementById('wall-type').value = type === 'good' ? 'siding' : 'unknown';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -728,6 +748,10 @@ function analyzeText(text) {
   result.hasWaterproofMethod = WATERPROOF_METHOD_KEYWORDS.some(k => text.includes(k));
   // ---- 足場 ----
   result.hasScaffold = SCAFFOLD_KEYWORDS.some(k => text.includes(k));
+  // 外壁の種類（シーリング量の目安に使う）。両方書かれている場合は判断しない。
+  const hasSiding = /サイディング|窯業系|金属系/.test(text);
+  const hasMortar = /モルタル|リシン|吹付|吹き付け/.test(text);
+  result.wallType = hasSiding && !hasMortar ? 'siding' : (hasMortar && !hasSiding ? 'mortar' : '');
   // ---- 保証 ----
   result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
   result.warrantyYears = null;
@@ -903,6 +927,11 @@ function applyExtractedData(d, roofInfo) {
   if (waterActiveNow) {
     document.getElementById('chk-no-drain').checked = !d.hasDrainKeyword;
     if (d.hasDrainKeyword) reportLines.push(`🚿 防水工事に必要な「改修ドレン」についての記載を確認できました。`);
+  }
+
+  if (d.wallType) {
+    document.getElementById('wall-type').value = d.wallType;
+    reportLines.push(`🧱 外壁の種類は「${WALL_TYPE_LABELS[d.wallType]}」と読み取りました（違う場合は「外壁の種類」を直してください）。`);
   }
 
   if (d.hasScaffold) {
@@ -1201,6 +1230,58 @@ function showGlossary(term) {
 let lastDiagnosis = null; // 直近の診断結果（履歴保存・相談送信に使う）
 let lastExtraction = null; // 直近のAI読み取り結果（「この診断になった理由」表示に使う）
 
+// 見積書がない方向け：採点はせず、入力した工事内容・面積から相場の目安だけを表示する。
+function wallTypeNote() {
+  const t = WALL_TYPE_LABELS[document.getElementById('wall-type').value];
+  return t ? '・' + t : '';
+}
+
+function showMarketOnly(ctx) {
+  const { wallOn, roofOn, balconyOn, rooftopOn, areaWall, areaRoof, areaBalcony, areaRooftop,
+    paintActive, waterActive, insulation, waterproofSurchargeApplied, displayMinMan, displayMaxMan, grade } = ctx;
+  const resultArea = document.getElementById('result-area');
+  resultArea.classList.add('market-only');
+  resultArea.style.display = 'block';
+  const scoreBox = document.getElementById('score-box');
+  scoreBox.className = 'score-box market';
+  document.getElementById('score-title').innerText = '📏 相場の目安（見積書なし）';
+  document.getElementById('score-badge').innerText = `約${displayMinMan}〜${displayMaxMan}万円`;
+  document.getElementById('score-meaning').textContent = '入力した工事内容と面積から計算した、おおよその金額です。';
+  document.getElementById('score-desc').innerText = '実際の金額は、建物の傷み具合・高さ・材料などで変わります。見積書が届いたら、金額を入れてもう一度診断すると、その見積もりが適正かチェックできます。';
+  const notes = [];
+  if (paintActive) notes.push('足場・洗浄・シーリング・付帯部塗装の目安を含む');
+  if (waterActive && insulation === 'insulated') notes.push('断熱材ありの単価で計算');
+  if (waterActive && waterproofSurchargeApplied) notes.push('施工面積が小さいため割増しを含む');
+  document.getElementById('price-compare').innerText = `目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（税込の概算${notes.length ? '・' + notes.join('・') : ''}）`;
+
+  const scopeParts = [];
+  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
+  if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
+  if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
+  if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
+
+  lastDiagnosis = {
+    id: 'd' + Date.now(),
+    timestamp: Date.now(),
+    score: '', level: 'market',
+    priceMan: '',
+    expectedMin: displayMinMan,
+    expectedMax: displayMaxMan,
+    scopeSummary: scopeParts.join('、'),
+    grade,
+    manufacturer: document.getElementById('paint-manufacturer').value.trim(),
+    product: document.getElementById('paint-product').value.trim(),
+    roofManufacturer: document.getElementById('roof-paint-manufacturer').value.trim(),
+    roofProduct: document.getElementById('roof-paint-product').value.trim(),
+    issues: []
+  };
+  track('score_shown');
+  saveHistoryRecord(lastDiagnosis);
+  setupLeadCard(lastDiagnosis);
+  renderResultFileInfo();
+  resultArea.scrollIntoView({ behavior: 'smooth' });
+}
+
 function calculateDiagnostic(e) {
   e.preventDefault();
 
@@ -1211,8 +1292,23 @@ function calculateDiagnostic(e) {
   const paintActive = wallOn || roofOn;
   const waterActive = balconyOn || rooftopOn;
 
+  // 入力エラーは alert() ではなく、診断ボタンの上に表示する（スマホでのフリーズ対策と同じ考え方）。
+  const errorEl = document.getElementById('diag-error');
+  const showDiagError = (text) => {
+    errorEl.textContent = text;
+    errorEl.classList.add('show');
+    errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  errorEl.classList.remove('show');
   if (!paintActive && !waterActive) {
-    alert('工事の内容（外壁塗装・屋根塗装・バルコニー防水・屋上防水のいずれか）を1つ以上選んでください。');
+    showDiagError('⚠️ 工事の内容（外壁塗装・屋根塗装・バルコニー防水・屋上防水のいずれか）を1つ以上選んでください。');
+    return;
+  }
+  const missingArea = [['chk-wall','area-wall','外壁塗装'],['chk-roof','area-roof','屋根塗装'],['chk-balcony','area-balcony','バルコニー防水'],['chk-rooftop','area-rooftop','屋上防水']]
+    .filter(([c, a]) => document.getElementById(c).checked && !(parseFloat(document.getElementById(a).value) > 0))
+    .map(x => x[2]);
+  if (missingArea.length) {
+    showDiagError(`⚠️ ${missingArea.join('・')}の施工面積（㎡）を入力してください。分からなければおおよそで大丈夫です。`);
     return;
   }
 
@@ -1263,15 +1359,30 @@ function calculateDiagnostic(e) {
   // 防水のみの場合は付帯部（外壁・屋根塗装に伴うもの）は加算しない。
   let attachedMin = 0, attachedMax = 0;
   if (paintActive) {
-    const attachedTsubo = ((wallOn ? areaWall : 0) + (roofOn ? areaRoof : 0)) / SQM_PER_TSUBO;
+    const paintArea = (wallOn ? areaWall : 0) + (roofOn ? areaRoof : 0);
+    const attachedTsubo = paintArea / SQM_PER_TSUBO;
     attachedMin = attachedTsubo * ATTACHED_RATE_PER_TSUBO.min;
     attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
+    // 足場（外壁があれば外壁面積、屋根だけなら屋根面積を基準）・高圧洗浄・シーリング（外壁のみ）
+    const scaffoldArea = (wallOn ? areaWall : areaRoof) * SCAFFOLD_AREA_FACTOR;
+    const sealingRate = getSealingRatePerWallSqm(document.getElementById('wall-type').value);
+    attachedMin += scaffoldArea * SCAFFOLD_RATE.min + paintArea * WASH_RATE.min + (wallOn ? areaWall * sealingRate.min : 0);
+    attachedMax += scaffoldArea * SCAFFOLD_RATE.max + paintArea * WASH_RATE.max + (wallOn ? areaWall * sealingRate.max : 0);
   }
   // 適正相場（付帯部塗装の目安を含む）。画面表示と、価格判定・スコア計算の両方でこの値を使う。
   // 表示している金額と判定基準を分けると、表示上は範囲内なのにバッジだけ古い基準のまま、
   // という矛盾が起きるため、判定にも必ずこの値を使うこと。
   const displayMinMan = Math.round((expectedMin + attachedMin) / 1000) / 10;
   const displayMaxMan = Math.round((expectedMax + attachedMax) / 1000) / 10;
+
+  // ---- 見積書がない（金額が空欄）場合は、採点せずに相場の目安だけを表示する ----
+  if (!(price > 0)) {
+    showMarketOnly({ wallOn, roofOn, balconyOn, rooftopOn, areaWall, areaRoof, areaBalcony, areaRooftop,
+      paintActive, waterActive, insulation, waterproofSurchargeApplied, displayMinMan, displayMaxMan, grade });
+    return;
+  }
+  document.getElementById('result-area').classList.remove('market-only');
+  document.getElementById('score-box').classList.remove('market');
 
   let score = 100;
   const issues = [];
@@ -1387,7 +1498,7 @@ function calculateDiagnostic(e) {
   }
 
   if (displayMinMan > 0) {
-    const attachedNote = paintActive ? '、付帯部塗装の目安を含む' : '';
+    const attachedNote = paintActive ? '、足場・洗浄・シーリング・付帯部塗装の目安を含む' : '';
     const waterproofNotes = [];
     if (waterActive && insulation === 'insulated') waterproofNotes.push('断熱材ありの単価で計算');
     if (waterActive && waterproofSurchargeApplied) waterproofNotes.push('施工面積が小さいため割増しを含む');
@@ -1465,7 +1576,7 @@ function calculateDiagnostic(e) {
 
   // ---- 工事範囲サマリー（履歴・相談送信で使う） ----
   const scopeParts = [];
-  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡)`);
+  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -1737,7 +1848,7 @@ function clearHistory() {
   renderHistory();
 }
 function levelLabel(level) {
-  return { good: '🟢 適正', warn: '🟡 要確認', danger: '🔴 注意' }[level] || '';
+  return { good: '🟢 適正', warn: '🟡 要確認', danger: '🔴 注意', market: '📏 相場確認' }[level] || '';
 }
 function formatDate(ts) {
   const d = new Date(ts);
@@ -1758,9 +1869,9 @@ function renderHistory() {
     <div class="history-item" onclick="showHistoryDetail('${r.id}')">
       <div class="history-top">
         <span class="history-date">${formatDate(r.timestamp)}</span>
-        <span class="history-score ${r.level}">${r.score}点 ${levelLabel(r.level)}</span>
+        <span class="history-score ${r.level}">${r.level === 'market' ? '' : r.score + '点 '}${levelLabel(r.level)}</span>
       </div>
-      <div class="history-sub">${r.scopeSummary || '工事内容未設定'} ／ 見積 ${r.priceMan}万円</div>
+      <div class="history-sub">${r.scopeSummary || '工事内容未設定'} ／ ${r.level === 'market' ? `相場 約${r.expectedMin}〜${r.expectedMax}万円` : `見積 ${r.priceMan}万円`}</div>
       ${r.priceJudgement ? `<div class="history-sub2">価格判定：${r.priceJudgement.icon} ${r.priceJudgement.label}</div>` : ''}
     </div>
   `).join('');
@@ -1794,10 +1905,10 @@ function showHistoryDetail(id) {
     <h3 style="margin-top:0;">${formatDate(r.timestamp)} の診断結果</h3>
     <div class="score-box ${r.level}" style="margin-bottom:14px;">
       <div class="score-title">${levelLabel(r.level)}</div>
-      <div class="score-badge">${r.score}点</div>
+      <div class="score-badge">${r.level === 'market' ? '－' : r.score + '点'}</div>
       <div class="price-compare">適正相場の目安：約 ${r.expectedMin}万円 〜 ${r.expectedMax}万円</div>
     </div>
-    <p style="font-size:13px;color:#4a5568;"><b>工事内容：</b>${r.scopeSummary || '－'}<br><b>見積提示額：</b>${r.priceMan}万円</p>
+    <p style="font-size:13px;color:#4a5568;"><b>工事内容：</b>${r.scopeSummary || '－'}<br><b>見積提示額：</b>${r.level === 'market' ? '（見積書なし）' : r.priceMan + '万円'}</p>
     ${priceJudgementHtml}
     ${subScoreHtml}
     <div class="issue-list">
@@ -1944,6 +2055,7 @@ function buildShareUrl() {
     grade: document.getElementById('paint-grade').value,
     method: document.getElementById('waterproof-method').value,
     ins: document.getElementById('waterproof-insulation').value,
+    wt: document.getElementById('wall-type').value,
     disc: document.getElementById('discount-amount').value,
     isk: document.getElementById('chk-isshiki').checked ? 1 : 0,
     np: document.getElementById('chk-no-paint-name').checked ? 1 : 0,
@@ -2001,6 +2113,7 @@ function applySharedStateFromUrl() {
     document.getElementById('paint-grade').value = state.grade;
     document.getElementById('waterproof-method').value = state.method;
     document.getElementById('waterproof-insulation').value = state.ins || 'none';
+    document.getElementById('wall-type').value = state.wt || 'unknown';
     document.getElementById('discount-amount').value = state.disc;
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
@@ -2050,16 +2163,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---- 利用状況の記録（広告の効果測定・離脱分析用） ----
   track('page_view');
   document.getElementById('lead-form').addEventListener('focusin', () => track('form_start'), { once: true });
-  const leadLineLink = document.getElementById('lead-line-link');
-  if (leadLineLink) leadLineLink.addEventListener('click', () => track('line_click'));
+  document.querySelectorAll('#lead-line-link, [data-track="line_click"]').forEach(a => a.addEventListener('click', () => track('line_click')));
+  document.getElementById('cta-market-btn').addEventListener('click', () => {
+    document.getElementById('diag-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   // ---- フェーズ3: 共有リンク（?share=...）からの読み込み ----
   // 共有された内容がある場合はそちらを優先し、無ければ今まで通りの初期値（サンプル用チェック）を入れる。
   const sharedLoaded = applySharedStateFromUrl();
-  if (!sharedLoaded) {
-    document.getElementById('chk-wall').checked = true;
-    document.getElementById('chk-rooftop').checked = true;
-  }
+  // 以前は外壁・屋上に最初からチェックと数字が入っていて、そのまま押すと実際と関係ない結果が出ていたため、
+  // 初期状態は空欄にする（共有リンクから開いた場合だけ、その内容を入れる）。
   onScopeChange();
   onAreaChange();
   checkLibraries();

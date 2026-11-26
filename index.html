@@ -41,6 +41,20 @@
 
       <button type="button" class="btn-primary hero-cta-btn" id="cta-check-btn">📄 見積書をチェックする</button>
 
+      <div class="no-quote-box">
+        <b>まだ見積書がない方へ</b>
+        <p>工事の種類と面積を入れるだけで、相場の目安がわかります（金額の入力は不要です）。</p>
+        <button type="button" class="btn-copy no-quote-btn" id="cta-market-btn">💡 相場の目安だけ見る</button>
+      </div>
+
+      <div class="contact-strip">
+        <p class="contact-strip-lead">見積書や建物の写真を見ながら、直接相談したい方はこちら（無料）</p>
+        <div class="contact-btns">
+          <a class="contact-btn line" href="https://lin.ee/wR2gvs8" target="_blank" rel="noopener" data-track="line_click">💬 LINEで相談</a>
+          <a class="contact-btn tel" href="tel:09018835221">📞 電話で相談</a>
+        </div>
+      </div>
+
       <div id="shared-notice" class="shared-notice" style="display:none;">🔗 共有された診断結果を表示しています。ご自身の見積書でも診断してみましょう。</div>
 
       <div class="sample-btns">
@@ -85,9 +99,17 @@
             <div class="scope-area" id="area-wall-wrap">
               <div class="area-row">
                 <label>施工面積</label>
-                <input type="number" id="area-wall" min="1" step="0.1" value="120" oninput="onAreaChange()">
+                <input type="number" id="area-wall" min="1" step="0.1" placeholder="例）120" inputmode="decimal" oninput="onAreaChange()">
                 <span>㎡</span>
-                <span class="tsubo-hint" id="tsubo-wall">（約36.3坪）</span>
+                <span class="tsubo-hint" id="tsubo-wall"></span>
+              </div>
+              <div class="area-row wall-type-row">
+                <label>外壁の種類</label>
+                <select id="wall-type">
+                  <option value="unknown">わからない</option>
+                  <option value="siding">サイディング（板を張った壁・目地がある）</option>
+                  <option value="mortar">モルタル（継ぎ目のない塗り壁）</option>
+                </select>
               </div>
             </div>
           </div>
@@ -97,9 +119,9 @@
             <div class="scope-area" id="area-roof-wrap">
               <div class="area-row">
                 <label>施工面積</label>
-                <input type="number" id="area-roof" min="1" step="0.1" value="60" oninput="onAreaChange()">
+                <input type="number" id="area-roof" min="1" step="0.1" placeholder="例）60" inputmode="decimal" oninput="onAreaChange()">
                 <span>㎡</span>
-                <span class="tsubo-hint" id="tsubo-roof">（約18.2坪）</span>
+                <span class="tsubo-hint" id="tsubo-roof"></span>
               </div>
             </div>
           </div>
@@ -109,9 +131,9 @@
             <div class="scope-area" id="area-balcony-wrap">
               <div class="area-row">
                 <label>施工面積</label>
-                <input type="number" id="area-balcony" min="1" step="0.1" value="8" oninput="onAreaChange()">
+                <input type="number" id="area-balcony" min="1" step="0.1" placeholder="例）8" inputmode="decimal" oninput="onAreaChange()">
                 <span>㎡</span>
-                <span class="tsubo-hint" id="tsubo-balcony">（約2.4坪）</span>
+                <span class="tsubo-hint" id="tsubo-balcony"></span>
               </div>
             </div>
           </div>
@@ -121,9 +143,9 @@
             <div class="scope-area" id="area-rooftop-wrap">
               <div class="area-row">
                 <label>施工面積</label>
-                <input type="number" id="area-rooftop" min="1" step="0.1" value="50" oninput="onAreaChange()">
+                <input type="number" id="area-rooftop" min="1" step="0.1" placeholder="例）50" inputmode="decimal" oninput="onAreaChange()">
                 <span>㎡</span>
-                <span class="tsubo-hint" id="tsubo-rooftop">（約15.1坪）</span>
+                <span class="tsubo-hint" id="tsubo-rooftop"></span>
               </div>
             </div>
           </div>
@@ -131,10 +153,10 @@
 
         <div class="card">
           <h2><span class="step-num">3</span> 見積もり提示総額</h2>
-          <div class="hint">見積書に書かれている「合計金額（税込）」を入力してください。</div>
+          <div class="hint">見積書に書かれている「合計金額（税込）」を入力してください。<b>まだ見積書がない方は空欄のままでOK</b>です（相場の目安だけを表示します）。</div>
           <div class="form-group">
-            <label>見積もり提示総額（万円）</label>
-            <input type="number" id="total-price" value="135" min="0.1" step="0.1" required>
+            <label>見積もり提示総額（万円）<span style="font-weight:normal;color:#718096;">　※空欄なら相場の目安だけ表示</span></label>
+            <input type="number" id="total-price" min="0.1" step="0.1" placeholder="例）135" inputmode="decimal">
           </div>
           <div class="form-group">
             <label>使われている塗料のグレード（分かれば選択）<span id="grade-auto" class="auto-tag" style="display:none;">AIが検出</span></label>
@@ -227,6 +249,7 @@
         </div>
 
         <div class="sticky-cta">
+          <div id="diag-error" class="diag-error" role="alert"></div>
           <button type="submit" class="btn-submit">この内容で診断する</button>
         </div>
       </form>
@@ -235,7 +258,7 @@
         <div id="score-box" class="score-box">
           <div class="score-title" id="score-title">診断結果</div>
           <div class="score-badge" id="score-badge">75点</div>
-          <div class="gauge-wrap"><div class="gauge-fill" id="gauge-fill" style="width:100%;"></div><div class="gauge-marker" id="gauge-marker" style="left:75%;"></div></div>
+          <div class="gauge-wrap diag-only"><div class="gauge-fill" id="gauge-fill" style="width:100%;"></div><div class="gauge-marker" id="gauge-marker" style="left:75%;"></div></div>
           <div class="score-meaning" id="score-meaning"></div>
           <div id="score-desc" style="font-size: 14px;"></div>
           <div class="price-compare" id="price-compare"></div>
@@ -249,6 +272,14 @@
         <div class="trust-strip">
           🏢 この診断は「飯島防水株式会社」（長野市・防水/塗装専門店）が無料で提供しています
         </div>
+
+      <div class="contact-strip">
+        <p class="contact-strip-lead">この結果について、LINEや電話で気軽にご相談いただけます（無料・しつこい営業はしません）</p>
+        <div class="contact-btns">
+          <a class="contact-btn line" href="https://lin.ee/wR2gvs8" target="_blank" rel="noopener" data-track="line_click">💬 LINEで相談</a>
+          <a class="contact-btn tel" href="tel:09018835221">📞 電話で相談</a>
+        </div>
+      </div>
 
         <div id="result-file-info" class="selected-file-info result-file-info"></div>
 
@@ -292,42 +323,42 @@
           </form>
         </div>
 
-        <div class="detail-link-row">
+        <div class="detail-link-row diag-only">
           <a href="#subscore-card" class="detail-anchor-link" onclick="event.preventDefault(); document.getElementById('subscore-card').scrollIntoView({behavior:'smooth', block:'start'});">▼ 詳しい分析結果（5項目評価・価格判定など）を見る</a>
         </div>
 
-        <div class="card" id="share-card" style="text-align:center;">
+        <div class="card diag-only" id="share-card" style="text-align:center;">
           <button type="button" class="btn-copy" id="share-result-btn" style="width:100%;" onclick="shareResult()">🔗 この診断結果をURLで共有する</button>
         </div>
 
-        <div class="card" id="subscore-card">
+        <div class="card diag-only" id="subscore-card">
           <h2>📊 5項目でみる診断結果</h2>
           <div id="subscore-list" class="subscore-list"></div>
         </div>
 
-        <div class="card" id="price-judgement-card">
+        <div class="card diag-only" id="price-judgement-card">
           <h2>💴 価格判定</h2>
           <div id="price-judgement-badge" class="price-judgement-badge"></div>
           <p id="price-judgement-hint" class="price-judgement-hint" style="display:none;"></p>
           <ul id="price-judgement-points" class="price-judgement-points"></ul>
         </div>
 
-        <div class="card">
+        <div class="card diag-only">
           <h2>🔍 検出されたポイント</h2>
           <div id="issue-list" class="issue-list"></div>
         </div>
 
-        <div class="card" id="reason-card">
+        <div class="card diag-only" id="reason-card">
           <h2>📝 この診断になった理由</h2>
           <ul id="reason-list" class="reason-list"></ul>
         </div>
 
-        <div class="card" id="checklist-card">
+        <div class="card diag-only" id="checklist-card">
           <h2>☑️ 確認した方がいいポイント</h2>
           <ol id="checklist-list" class="checklist-list"></ol>
         </div>
 
-        <div class="card">
+        <div class="card diag-only">
           <h2>👨‍🏫 AI診断士による、やさしい解説</h2>
           <div id="ai-explain"></div>
         </div>
@@ -339,7 +370,7 @@
           </a>
         </div>
 
-        <div class="card">
+        <div class="card diag-only">
           <h2>✉️ 業者への確認フレーズ（コピーしてそのまま送れます）</h2>
           <p style="font-size: 12px; color: #666; margin-top: 0;">気になる点をLINEやメールでそのまま質問できる文章です。カテゴリごとにまとめています。</p>
           <div id="template-container"></div>
