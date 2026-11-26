@@ -129,7 +129,9 @@ const TAX_MULTIPLIER = 1.1;
 // 以前はこれらが相場に入っておらず、足場込みの普通の見積もりでも「やや高め」と出ていた。
 // 足場・シーリング単価は飯島防水の実勢（2026-11 史郎さん確認）。洗浄単価と各係数は仮。
 const SCAFFOLD_AREA_FACTOR = 1.5;                  // 足場の面積 ≒ 外壁面積 × 1.5（自社見積：外壁298㎡に足場447㎡）
-const SCAFFOLD_RATE = { min: 800, max: 1200 };     // 足場 1㎡あたり（円・自社実勢）
+const SCAFFOLD_RATE = { min: 800, max: 1200 };
+// 平屋は仮設足場を組まず、脚立足場など一式で済むことが多い（自社見積：平屋 脚立足場 一式12万円）。
+const HIRAYA_SCAFFOLD_LUMP = { min: 100000, max: 150000 }; // 一式（円・税抜。12万円の前後で仮）     // 足場 1㎡あたり（円・自社実勢）
 const WASH_RATE = { min: 250, max: 350 };          // 高圧洗浄 塗装面積1㎡あたり（円・自社見積：外壁300／屋根ケレン込み350）
 const SEALING_RATE_PER_M = { min: 1000, max: 1800 }; // シーリング 1mあたり（円・自社実勢：増し打ち約1,000／打ち替え1,200〜1,800）
 // 外壁1㎡あたりのシーリング長さ（m・仮）。サイディングは目地が多く、モルタルはサッシまわり程度。
@@ -210,6 +212,8 @@ function onScopeChange() {
   toggle('chk-balcony', 'area-balcony-wrap');
   toggle('chk-rooftop', 'area-rooftop-wrap');
   toggle('chk-roof', 'roof-paint-wrap');
+  document.getElementById('floors-wrap').style.display =
+    (document.getElementById('chk-wall').checked || document.getElementById('chk-roof').checked) ? '' : 'none';
 
   const paintActive = document.getElementById('chk-wall').checked || document.getElementById('chk-roof').checked;
   const waterActive = document.getElementById('chk-balcony').checked || document.getElementById('chk-rooftop').checked;
@@ -276,6 +280,7 @@ function loadSample(type) {
   document.getElementById('roof-paint-product').value = '';
   document.getElementById('waterproof-insulation').value = 'none';
   document.getElementById('wall-type').value = 'siding';
+  document.getElementById('building-floors').value = 'multi';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -766,6 +771,7 @@ function analyzeText(text) {
   if (/モルタル|リシン|吹付|吹き付け/.test(text)) found.push('mortar');
   if (/ALC|ＡＬＣ|ヘーベル|軽量気泡コンクリート/i.test(text)) found.push('alc');
   result.wallType = found.length === 1 ? found[0] : '';
+  result.isHiraya = /平屋|脚立足場/.test(text);
   // ---- 保証 ----
   result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
   result.warrantyYears = null;
@@ -943,6 +949,10 @@ function applyExtractedData(d, roofInfo) {
     if (d.hasDrainKeyword) reportLines.push(`🚿 防水工事に必要な「改修ドレン」についての記載を確認できました。`);
   }
 
+  if (d.isHiraya) {
+    document.getElementById('building-floors').value = 'hiraya';
+    reportLines.push(`🏠 「平屋」または「脚立足場」の記載があったため、平屋として計算します（違う場合は「建物の階数」を直してください）。`);
+  }
   if (d.wallType) {
     document.getElementById('wall-type').value = d.wallType;
     reportLines.push(`🧱 外壁の種類は「${WALL_TYPE_LABELS[d.wallType]}」と読み取りました（違う場合は「外壁の種類」を直してください）。`);
@@ -1270,6 +1280,7 @@ function showMarketOnly(ctx) {
 
   const scopeParts = [];
   if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
+  if (paintActive && document.getElementById('building-floors').value === 'hiraya') scopeParts.push('平屋');
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -1384,10 +1395,13 @@ function calculateDiagnostic(e) {
       attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
     }
     // 足場（外壁があれば外壁面積、屋根だけなら屋根面積を基準）・高圧洗浄・シーリング（外壁のみ）
+    const isHiraya = document.getElementById('building-floors').value === 'hiraya';
     const scaffoldArea = (wallOn ? areaWall : areaRoof) * SCAFFOLD_AREA_FACTOR;
+    const scaffoldMin = isHiraya ? HIRAYA_SCAFFOLD_LUMP.min : scaffoldArea * SCAFFOLD_RATE.min;
+    const scaffoldMax = isHiraya ? HIRAYA_SCAFFOLD_LUMP.max : scaffoldArea * SCAFFOLD_RATE.max;
     const sealingRate = getSealingRatePerWallSqm(document.getElementById('wall-type').value);
-    attachedMin += scaffoldArea * SCAFFOLD_RATE.min + paintArea * WASH_RATE.min + (wallOn ? areaWall * sealingRate.min : 0);
-    attachedMax += scaffoldArea * SCAFFOLD_RATE.max + paintArea * WASH_RATE.max + (wallOn ? areaWall * sealingRate.max : 0);
+    attachedMin += scaffoldMin + paintArea * WASH_RATE.min + (wallOn ? areaWall * sealingRate.min : 0);
+    attachedMax += scaffoldMax + paintArea * WASH_RATE.max + (wallOn ? areaWall * sealingRate.max : 0);
   }
   // 適正相場（付帯部塗装の目安を含む）。画面表示と、価格判定・スコア計算の両方でこの値を使う。
   // 表示している金額と判定基準を分けると、表示上は範囲内なのにバッジだけ古い基準のまま、
@@ -1601,6 +1615,7 @@ function calculateDiagnostic(e) {
   // ---- 工事範囲サマリー（履歴・相談送信で使う） ----
   const scopeParts = [];
   if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
+  if (paintActive && document.getElementById('building-floors').value === 'hiraya') scopeParts.push('平屋');
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -2080,6 +2095,7 @@ function buildShareUrl() {
     method: document.getElementById('waterproof-method').value,
     ins: document.getElementById('waterproof-insulation').value,
     wt: document.getElementById('wall-type').value,
+    fl: document.getElementById('building-floors').value,
     disc: document.getElementById('discount-amount').value,
     isk: document.getElementById('chk-isshiki').checked ? 1 : 0,
     np: document.getElementById('chk-no-paint-name').checked ? 1 : 0,
@@ -2138,6 +2154,7 @@ function applySharedStateFromUrl() {
     document.getElementById('waterproof-method').value = state.method;
     document.getElementById('waterproof-insulation').value = state.ins || 'none';
     document.getElementById('wall-type').value = WALL_TYPE_LABELS[state.wt] ? state.wt : 'siding';
+    document.getElementById('building-floors').value = state.fl === 'hiraya' ? 'hiraya' : 'multi';
     document.getElementById('discount-amount').value = state.disc;
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
