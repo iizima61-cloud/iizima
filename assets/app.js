@@ -156,6 +156,12 @@ const MANUFACTURER_KEYWORDS = [
   "プレマテックス","日進産業","ガイナ","大日本塗料","水谷ペイント","水谷","菊水化学工業","菊水化学","キクスイ","アトミクス",
   "エーゲンダイヤ","トウペ","中国塗料","ロックペイント","四国化成"
 ];
+// 略記・通称を正式な会社名にそろえる（「水谷・キクスイ」のような表示を避ける）
+const MANUFACTURER_OFFICIAL = {
+  "SK化研": "エスケー化研", "アステック": "アステックペイント", "水谷": "水谷ペイント",
+  "菊水化学": "菊水化学工業", "キクスイ": "菊水化学工業"
+};
+function officialManufacturer(name) { return MANUFACTURER_OFFICIAL[name] || name; }
 const PAINT_PRODUCT_KEYWORDS = [
   "パーフェクトトップ","プレミアムシリコン","超低汚染リファイン","セラMシリコン","ラジカルガード",
   "ナノコンポジット","クリーンマイルド","ファインパーフェクト","ジンクシリコン","エスケーハイフッソ",
@@ -274,6 +280,7 @@ function loadSample(type) {
   onScopeChange();
   onAreaChange();
   document.getElementById('ai-report').style.display = 'none';
+  lastExtraction = null; // 見本を開いたときに、前に読み取った見積書の金額が「理由」に残らないようにする
   document.getElementById('paint-manufacturer').value = '';
   document.getElementById('paint-product').value = '';
   document.getElementById('roof-paint-manufacturer').value = '';
@@ -740,8 +747,9 @@ function analyzeText(text) {
   const foundManufacturers = [];
   for (const m of MANUFACTURER_KEYWORDS) {
     if (!text.includes(m)) continue;
-    if (foundManufacturers.some(existing => existing.includes(m) || m.includes(existing))) continue;
-    foundManufacturers.push(m);
+    const official = officialManufacturer(m);
+    if (foundManufacturers.includes(official)) continue;
+    foundManufacturers.push(official);
   }
   if (!foundManufacturers.length) {
     for (const p of PAINT_PRODUCT_KEYWORDS) { if (text.includes(p)) { foundManufacturers.push(p); break; } }
@@ -751,7 +759,8 @@ function analyzeText(text) {
   result.foundKeywords = foundManufacturers;
 
   // ---- フェーズ4: メーカー名・商品名をそれぞれ別の入力欄に反映するため、個別にも保持する ----
-  result.manufacturerOnly = MANUFACTURER_KEYWORDS.find(m => text.includes(m)) || null;
+  const firstMaker = MANUFACTURER_KEYWORDS.find(m => text.includes(m));
+  result.manufacturerOnly = firstMaker ? officialManufacturer(firstMaker) : null;
   result.productOnly = PAINT_PRODUCT_KEYWORDS.find(p => text.includes(p)) || null;
 
   // ---- 一式の出現回数 ----
@@ -857,7 +866,7 @@ function extractNearKeyword(text, contextKeywords, candidateList, windowSize) {
 
 function extractRoofPaintInfo(text) {
   return {
-    roofManufacturerOnly: extractNearKeyword(text, ROOF_KEYWORDS, MANUFACTURER_KEYWORDS, 50),
+    roofManufacturerOnly: (m => m ? officialManufacturer(m) : m)(extractNearKeyword(text, ROOF_KEYWORDS, MANUFACTURER_KEYWORDS, 50)),
     roofProductOnly: extractNearKeyword(text, ROOF_KEYWORDS, PAINT_PRODUCT_KEYWORDS, 50)
   };
 }
@@ -1067,7 +1076,7 @@ function computeSubScores(ctx) {
   const { priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod } = ctx;
   const clamp = v => Math.max(0, Math.min(100, v));
 
-  const priceScoreMap = { good: 95, warn: 65, danger: 35, neutral: null };
+  const priceScoreMap = { good: 100, warn: 65, danger: 35, neutral: null };
   const priceScore = priceScoreMap[priceJudgement.tone];
 
   const transparencyScore = clamp(100 - (isIsshiki ? 40 : 0));
@@ -1120,9 +1129,14 @@ function buildReasonList(ctx) {
     return lines;
   }
 
-  lines.push(ext.totalPriceMan
-    ? `✅ 見積書から総額（約${ext.totalPriceMan}万円）が読み取れました。`
-    : '❔ 総額は見積書から読み取れませんでした（不明）。入力された金額をもとに診断しています。');
+  const enteredPrice = parseFloat(document.getElementById('total-price').value);
+  if (ext.totalPriceMan && enteredPrice && Math.abs(enteredPrice - ext.totalPriceMan) >= 1) {
+    lines.push(`✅ 見積書から総額（約${ext.totalPriceMan}万円）が読み取れました。※診断は、入力欄の金額（${enteredPrice}万円）で行っています。`);
+  } else {
+    lines.push(ext.totalPriceMan
+      ? `✅ 見積書から総額（約${ext.totalPriceMan}万円）が読み取れました。`
+      : '❔ 総額は見積書から読み取れませんでした（不明）。入力された金額をもとに診断しています。');
+  }
 
   if (wallOn) {
     lines.push(ext.areaWall
@@ -1150,7 +1164,7 @@ function buildReasonList(ctx) {
       ? `✅ 塗料のグレード（${GRADE_LABELS[ext.grade]}）の記載が見つかりました。`
       : '❔ 塗料のグレードは記載が見当たらず不明です。');
     lines.push((ext.manufacturers && ext.manufacturers.length)
-      ? `✅ 塗料メーカー・商品名（${ext.manufacturers.join('・')}）の記載が見つかりました。`
+      ? `✅ 塗料メーカー・商品名（${ext.manufacturers.join('、')}）の記載が見つかりました。`
       : '❔ 塗料のメーカー名・正式な商品名は記載されておらず不明です。');
     lines.push(ext.hasRepairKeywords
       ? '✅ 下地補修・シーリングに関する記載が見つかりました。'
@@ -1449,7 +1463,13 @@ function calculateDiagnostic(e) {
       issues.push({ level: 'warn', tag: '価格', title: '相場よりやや高めの金額です', desc: `目安となる適正相場は約${displayMinMan}万円〜${displayMaxMan}万円ですが、それより高めの水準です。中間業者を挟んでいる場合や、諸経費が多めに計上されている可能性があります。` });
       qGeneral.push('・相場と比較してやや高めに感じましたが、金額の内訳（諸経費や仮設費など）を詳しく教えていただけますか？');
     } else {
-      issues.push({ level: 'good', tag: '価格', title: '金額は相場の範囲内です', desc: `お見積り金額（${price}万円）は、選択された工事内容における適正相場（約${displayMinMan}万円〜${displayMaxMan}万円）の範囲に収まっています。` });
+      if (price > displayMaxMan) {
+        issues.push({ level: 'good', tag: '価格', title: '目安の上限をやや超えていますが、許容範囲です', desc: `お見積り金額（${price}万円）は、目安（約${displayMinMan}万円〜${displayMaxMan}万円）の上限を少し超えていますが、建物の形・劣化の具合・使う材料で十分ありえる差です。気になる場合は金額の内訳を確認しましょう。` });
+      } else if (price < displayMinMan) {
+        issues.push({ level: 'good', tag: '価格', title: '目安の下限を少し下回りますが、許容範囲です', desc: `お見積り金額（${price}万円）は、目安（約${displayMinMan}万円〜${displayMaxMan}万円）の下限を少し下回りますが、大きな差ではありません。念のため塗る回数や下地処理が含まれているか確認しておくと安心です。` });
+      } else {
+        issues.push({ level: 'good', tag: '価格', title: '金額は目安の範囲内です', desc: `お見積り金額（${price}万円）は、選択された工事内容の目安（約${displayMinMan}万円〜${displayMaxMan}万円）の範囲に収まっています。` });
+      }
     }
   }
 
@@ -1522,7 +1542,7 @@ function calculateDiagnostic(e) {
     if (priceHasNoConcern) {
       scoreTitle.innerText = '🟢 総合判定：適正（健康優良児タイプ）';
       scoreDesc.innerText = '記載内容・金額ともに大きな問題は見られません。安心して検討を進めやすい見積もりです。';
-      persona = 'とても良いお見積りですね！内訳もしっかりしていて、金額も相場の範囲内です。人間ドックで例えるなら「健康優良児」タイプ。最終決定の前に、使う材料の商品名や塗る回数、実際に施工する職人まで確認しておくと、10年後も安心です。';
+      persona = 'とても良いお見積りですね！内訳もしっかりしていて、金額も相場から見て無理のない水準です。人間ドックで例えるなら「健康優良児」タイプ。最終決定の前に、使う材料の商品名や塗る回数、実際に施工する職人まで確認しておくと、10年後も安心です。';
     } else {
       scoreTitle.innerText = '🟢 総合判定：概ね適正（価格は要確認）';
       scoreDesc.innerText = `価格面は少し確認が必要ですが、それ以外の記載内容は良好です。下の「確認フレーズ」を使って金額の内訳を確認しましょう（価格判定：${priceJudgement.icon} ${priceJudgement.label}）。`;
@@ -1829,7 +1849,7 @@ function formatCompareCell(key, c) {
       const parts = [];
       if (c.grade) parts.push(GRADE_LABELS[c.grade] + '塗料');
       if (c.waterproofMethod) parts.push(WATERPROOF_METHOD_LABELS[c.waterproofMethod]);
-      if (c.manufacturers && c.manufacturers.length) parts.push(c.manufacturers.join('・'));
+      if (c.manufacturers && c.manufacturers.length) parts.push(c.manufacturers.join('、'));
       return parts.length ? parts.join('<br>') : '不明';
     }
     case 'sealing': return c.hasSealing ? '記載あり' : '記載なし（不明）';
@@ -2009,6 +2029,50 @@ function reportAdsConversion() {
   if (typeof gtag === 'function') {
     try { gtag('event', 'conversion', { 'send_to': ADS_CONVERSION_SEND_TO }); } catch (e) { /* 広告タグの失敗は無視 */ }
   }
+}
+
+// 診断結果をLINEで送るための文章（クリップボードにコピーして、LINEに貼ってもらう）
+function buildResultSummaryText() {
+  const t = id => (document.getElementById(id) || {}).innerText || '';
+  const scope = [['chk-wall', '外壁', 'area-wall'], ['chk-roof', '屋根', 'area-roof'], ['chk-balcony', 'バルコニー', 'area-balcony'], ['chk-rooftop', '屋上', 'area-rooftop']]
+    .filter(([c]) => document.getElementById(c) && document.getElementById(c).checked)
+    .map(([, label, a]) => { const v = document.getElementById(a).value; return v ? `${label}${v}㎡` : label; });
+  const price = document.getElementById('total-price').value;
+  const lines = ['【見積診断アプリの結果】'];
+  const market = document.getElementById('result-area').classList.contains('market-only');
+  if (!market) lines.push(`診断：${t('score-badge')}　${t('score-title').replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '')}`);
+  if (scope.length) lines.push(`工事：${scope.join('・')}`);
+  lines.push(`見積金額：${price ? price + '万円' : '見積書なし'}`);
+  const compare = t('price-compare');
+  if (compare) lines.push(compare);
+  lines.push(price ? 'この見積書を見てもらえますか？（写真を送ります）' : '工事の相談をしたいです。');
+  return lines.join('\n');
+}
+
+function setupResultLineBar() {
+  const bar = document.getElementById('result-line-bar');
+  const btn = document.getElementById('result-line-btn');
+  const note = document.getElementById('result-line-note');
+  const area = document.getElementById('result-area');
+  const main = document.querySelector('main');
+  if (!bar || !btn) return;
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(entries => {
+      const on = entries[0].isIntersecting && area.style.display === 'block';
+      bar.classList.toggle('show', on);
+      if (main) main.classList.toggle('has-line-bar', on);
+    }, { threshold: 0 }).observe(area);
+  }
+  btn.addEventListener('click', () => {
+    track('line_click');
+    reportAdsConversion();
+    const text = buildResultSummaryText();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => note.classList.add('show')).catch(() => {});
+      }
+    } catch (e) { /* コピーできなくてもLINEは開く */ }
+  });
 }
 
 const LEAD_SEND_TIMEOUT_MS = 20000; // 相談フォームの返事を待つ時間
@@ -2228,6 +2292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     reportAdsConversion();
   }));
   document.querySelectorAll('[data-track="tel_click"]').forEach(a => a.addEventListener('click', () => reportAdsConversion()));
+  setupResultLineBar();
   document.getElementById('cta-market-btn').addEventListener('click', (e) => {
     e.preventDefault();
     document.getElementById('diag-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
