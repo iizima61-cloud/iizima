@@ -313,3 +313,12 @@ footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 16px
 .self-check-sub { margin:0 0 6px; font-size:12px; color:var(--sub); line-height:1.7; }
 .self-check-sub a { color:var(--blue); font-weight:bold; }
 .sample-btns .sample-label { font-size:12px; color:var(--sub); align-self:center; }
+
+/* 診断後、画面の下に常に出るLINEボタン（結果エリアが見えている間だけ） */
+.result-line-bar { position: fixed; left: 0; right: 0; bottom: calc(58px + var(--safe-bottom)); z-index: 25; max-width: 480px; margin: 0 auto; padding: 8px 12px; background: #fff; border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.06); transform: translateY(150%); transition: transform .25s; pointer-events: none; }
+.result-line-bar.show { transform: none; pointer-events: auto; }
+.result-line-btn { display: block; text-align: center; background: #06c755; color: #fff; font-weight: bold; font-size: 15px; padding: 12px 8px; border-radius: 10px; text-decoration: none; }
+.result-line-note { display: none; font-size: 11px; color: var(--sub); text-align: center; margin-top: 5px; }
+.result-line-note.show { display: block; }
+main.has-line-bar { padding-bottom: calc(150px + var(--safe-bottom)); }
+.result-offer { margin-top: 12px; }
