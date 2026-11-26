@@ -125,11 +125,17 @@ const SCAFFOLD_AREA_FACTOR = 1.2;                  // 足場の面積 ≒ 塗装
 const SCAFFOLD_RATE = { min: 800, max: 1200 };     // 足場 1㎡あたり（円・自社実勢）
 const WASH_RATE = { min: 150, max: 300 };          // 高圧洗浄 塗装面積1㎡あたり（円・仮）
 const SEALING_RATE_PER_M = { min: 1000, max: 1800 }; // シーリング 1mあたり（円・自社実勢：増し打ち約1,000／打ち替え1,200〜1,800）
-const SEALING_M_PER_WALL_SQM = { min: 1.0, max: 1.5 }; // 外壁1㎡あたりのシーリング長さ（m・仮。サイディング想定）
-const SEALING_RATE_PER_WALL_SQM = {
-  min: SEALING_RATE_PER_M.min * SEALING_M_PER_WALL_SQM.min,
-  max: SEALING_RATE_PER_M.max * SEALING_M_PER_WALL_SQM.max
+// 外壁1㎡あたりのシーリング長さ（m・仮）。サイディングは目地が多く、モルタルはサッシまわり程度。
+const SEALING_M_PER_WALL_SQM = {
+  siding:  { min: 1.0, max: 1.5 },
+  mortar:  { min: 0.2, max: 0.4 },
+  unknown: { min: 0.2, max: 1.5 }
 };
+const WALL_TYPE_LABELS = { siding: 'サイディング', mortar: 'モルタル' };
+function getSealingRatePerWallSqm(wallType) {
+  const m = SEALING_M_PER_WALL_SQM[wallType] || SEALING_M_PER_WALL_SQM.unknown;
+  return { min: SEALING_RATE_PER_M.min * m.min, max: SEALING_RATE_PER_M.max * m.max };
+}
 
 const MANUFACTURER_KEYWORDS = [
   "日本ペイント","関西ペイント","エスケー化研","SK化研","アステックペイント","アステック",
@@ -257,6 +263,7 @@ function loadSample(type) {
   document.getElementById('roof-paint-manufacturer').value = '';
   document.getElementById('roof-paint-product').value = '';
   document.getElementById('waterproof-insulation').value = 'none';
+  document.getElementById('wall-type').value = type === 'good' ? 'siding' : 'unknown';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -741,6 +748,10 @@ function analyzeText(text) {
   result.hasWaterproofMethod = WATERPROOF_METHOD_KEYWORDS.some(k => text.includes(k));
   // ---- 足場 ----
   result.hasScaffold = SCAFFOLD_KEYWORDS.some(k => text.includes(k));
+  // 外壁の種類（シーリング量の目安に使う）。両方書かれている場合は判断しない。
+  const hasSiding = /サイディング|窯業系|金属系/.test(text);
+  const hasMortar = /モルタル|リシン|吹付|吹き付け/.test(text);
+  result.wallType = hasSiding && !hasMortar ? 'siding' : (hasMortar && !hasSiding ? 'mortar' : '');
   // ---- 保証 ----
   result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
   result.warrantyYears = null;
@@ -916,6 +927,11 @@ function applyExtractedData(d, roofInfo) {
   if (waterActiveNow) {
     document.getElementById('chk-no-drain').checked = !d.hasDrainKeyword;
     if (d.hasDrainKeyword) reportLines.push(`🚿 防水工事に必要な「改修ドレン」についての記載を確認できました。`);
+  }
+
+  if (d.wallType) {
+    document.getElementById('wall-type').value = d.wallType;
+    reportLines.push(`🧱 外壁の種類は「${WALL_TYPE_LABELS[d.wallType]}」と読み取りました（違う場合は「外壁の種類」を直してください）。`);
   }
 
   if (d.hasScaffold) {
@@ -1215,6 +1231,11 @@ let lastDiagnosis = null; // 直近の診断結果（履歴保存・相談送信
 let lastExtraction = null; // 直近のAI読み取り結果（「この診断になった理由」表示に使う）
 
 // 見積書がない方向け：採点はせず、入力した工事内容・面積から相場の目安だけを表示する。
+function wallTypeNote() {
+  const t = WALL_TYPE_LABELS[document.getElementById('wall-type').value];
+  return t ? '・' + t : '';
+}
+
 function showMarketOnly(ctx) {
   const { wallOn, roofOn, balconyOn, rooftopOn, areaWall, areaRoof, areaBalcony, areaRooftop,
     paintActive, waterActive, insulation, waterproofSurchargeApplied, displayMinMan, displayMaxMan, grade } = ctx;
@@ -1234,7 +1255,7 @@ function showMarketOnly(ctx) {
   document.getElementById('price-compare').innerText = `目安：約 ${displayMinMan}万円 〜 ${displayMaxMan}万円（税込の概算${notes.length ? '・' + notes.join('・') : ''}）`;
 
   const scopeParts = [];
-  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡)`);
+  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -1344,8 +1365,9 @@ function calculateDiagnostic(e) {
     attachedMax = attachedTsubo * ATTACHED_RATE_PER_TSUBO.max;
     // 足場（外壁があれば外壁面積、屋根だけなら屋根面積を基準）・高圧洗浄・シーリング（外壁のみ）
     const scaffoldArea = (wallOn ? areaWall : areaRoof) * SCAFFOLD_AREA_FACTOR;
-    attachedMin += scaffoldArea * SCAFFOLD_RATE.min + paintArea * WASH_RATE.min + (wallOn ? areaWall * SEALING_RATE_PER_WALL_SQM.min : 0);
-    attachedMax += scaffoldArea * SCAFFOLD_RATE.max + paintArea * WASH_RATE.max + (wallOn ? areaWall * SEALING_RATE_PER_WALL_SQM.max : 0);
+    const sealingRate = getSealingRatePerWallSqm(document.getElementById('wall-type').value);
+    attachedMin += scaffoldArea * SCAFFOLD_RATE.min + paintArea * WASH_RATE.min + (wallOn ? areaWall * sealingRate.min : 0);
+    attachedMax += scaffoldArea * SCAFFOLD_RATE.max + paintArea * WASH_RATE.max + (wallOn ? areaWall * sealingRate.max : 0);
   }
   // 適正相場（付帯部塗装の目安を含む）。画面表示と、価格判定・スコア計算の両方でこの値を使う。
   // 表示している金額と判定基準を分けると、表示上は範囲内なのにバッジだけ古い基準のまま、
@@ -1554,7 +1576,7 @@ function calculateDiagnostic(e) {
 
   // ---- 工事範囲サマリー（履歴・相談送信で使う） ----
   const scopeParts = [];
-  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡)`);
+  if (wallOn) scopeParts.push(`外壁塗装(${areaWall}㎡${wallTypeNote()})`);
   if (roofOn) scopeParts.push(`屋根塗装(${areaRoof}㎡)`);
   if (balconyOn) scopeParts.push(`バルコニー防水(${areaBalcony}㎡)`);
   if (rooftopOn) scopeParts.push(`屋上防水(${areaRooftop}㎡)`);
@@ -2033,6 +2055,7 @@ function buildShareUrl() {
     grade: document.getElementById('paint-grade').value,
     method: document.getElementById('waterproof-method').value,
     ins: document.getElementById('waterproof-insulation').value,
+    wt: document.getElementById('wall-type').value,
     disc: document.getElementById('discount-amount').value,
     isk: document.getElementById('chk-isshiki').checked ? 1 : 0,
     np: document.getElementById('chk-no-paint-name').checked ? 1 : 0,
@@ -2090,6 +2113,7 @@ function applySharedStateFromUrl() {
     document.getElementById('paint-grade').value = state.grade;
     document.getElementById('waterproof-method').value = state.method;
     document.getElementById('waterproof-insulation').value = state.ins || 'none';
+    document.getElementById('wall-type').value = state.wt || 'unknown';
     document.getElementById('discount-amount').value = state.disc;
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
