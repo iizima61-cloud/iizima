@@ -129,9 +129,14 @@ const SEALING_RATE_PER_M = { min: 1000, max: 1800 }; // シーリング 1mあた
 const SEALING_M_PER_WALL_SQM = {
   siding:  { min: 1.0, max: 1.5 },
   mortar:  { min: 0.2, max: 0.4 },
+  alc:     { min: 1.5, max: 2.0 },  // ALCはパネル幅60cmで目地が多い（仮）
   unknown: { min: 0.2, max: 1.5 }
 };
-const WALL_TYPE_LABELS = { siding: 'サイディング', mortar: 'モルタル' };
+const WALL_TYPE_LABELS = { siding: 'サイディング', mortar: 'モルタル', alc: 'ALC' };
+
+// 相場の幅の削り具合。0なら全項目の最安〜最高をそのまま、0.25なら上下を1/4ずつ削る。
+// 判定（安すぎる・高め）も同じ幅で行う。
+const RANGE_TRIM = 0.25;
 function getSealingRatePerWallSqm(wallType) {
   const m = SEALING_M_PER_WALL_SQM[wallType] || SEALING_M_PER_WALL_SQM.unknown;
   return { min: SEALING_RATE_PER_M.min * m.min, max: SEALING_RATE_PER_M.max * m.max };
@@ -263,7 +268,7 @@ function loadSample(type) {
   document.getElementById('roof-paint-manufacturer').value = '';
   document.getElementById('roof-paint-product').value = '';
   document.getElementById('waterproof-insulation').value = 'none';
-  document.getElementById('wall-type').value = type === 'good' ? 'siding' : 'unknown';
+  document.getElementById('wall-type').value = 'siding';
 }
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
   document.getElementById('chk-isshiki').checked = isshiki;
@@ -749,9 +754,11 @@ function analyzeText(text) {
   // ---- 足場 ----
   result.hasScaffold = SCAFFOLD_KEYWORDS.some(k => text.includes(k));
   // 外壁の種類（シーリング量の目安に使う）。両方書かれている場合は判断しない。
-  const hasSiding = /サイディング|窯業系|金属系/.test(text);
-  const hasMortar = /モルタル|リシン|吹付|吹き付け/.test(text);
-  result.wallType = hasSiding && !hasMortar ? 'siding' : (hasMortar && !hasSiding ? 'mortar' : '');
+  const found = [];
+  if (/サイディング|窯業系|金属系/.test(text)) found.push('siding');
+  if (/モルタル|リシン|吹付|吹き付け/.test(text)) found.push('mortar');
+  if (/ALC|ＡＬＣ|ヘーベル|軽量気泡コンクリート/i.test(text)) found.push('alc');
+  result.wallType = found.length === 1 ? found[0] : '';
   // ---- 保証 ----
   result.hasWarranty = WARRANTY_KEYWORDS.some(k => text.includes(k));
   result.warrantyYears = null;
@@ -1372,8 +1379,12 @@ function calculateDiagnostic(e) {
   // 適正相場（付帯部塗装の目安を含む）。画面表示と、価格判定・スコア計算の両方でこの値を使う。
   // 表示している金額と判定基準を分けると、表示上は範囲内なのにバッジだけ古い基準のまま、
   // という矛盾が起きるため、判定にも必ずこの値を使うこと。
-  const displayMinMan = Math.round((expectedMin + attachedMin) / 1000) / 10;
-  const displayMaxMan = Math.round((expectedMax + attachedMax) / 1000) / 10;
+  // 各項目の「安い側」「高い側」を全部足すと幅が広くなりすぎるため、両端を少し削った
+  // 「よくある価格帯」を相場として表示・判定に使う（RANGE_TRIM 参照）。
+  const rawMin = expectedMin + attachedMin, rawMax = expectedMax + attachedMax;
+  const span = rawMax - rawMin;
+  const displayMinMan = Math.round((rawMin + span * RANGE_TRIM) / 1000) / 10;
+  const displayMaxMan = Math.round((rawMax - span * RANGE_TRIM) / 1000) / 10;
 
   // ---- 見積書がない（金額が空欄）場合は、採点せずに相場の目安だけを表示する ----
   if (!(price > 0)) {
@@ -2113,7 +2124,7 @@ function applySharedStateFromUrl() {
     document.getElementById('paint-grade').value = state.grade;
     document.getElementById('waterproof-method').value = state.method;
     document.getElementById('waterproof-insulation').value = state.ins || 'none';
-    document.getElementById('wall-type').value = state.wt || 'unknown';
+    document.getElementById('wall-type').value = WALL_TYPE_LABELS[state.wt] ? state.wt : 'siding';
     document.getElementById('discount-amount').value = state.disc;
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
