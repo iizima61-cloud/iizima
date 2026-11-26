@@ -2001,6 +2001,16 @@ function openImagePreview(src) {
    会社側で google-apps-script/Code.gs をデプロイし、CONFIG.sheetsWebhookUrl を設定すると、
    お客様が「相談したい」を選んだ場合に診断結果と連絡先がスプレッドシートに自動で貯まります。
 ==================================================================== */
+// Google広告に「お問い合わせ」の成果を送る。フォーム送信だけでなく、LINE・電話ボタンを押したときも送る。
+// （現状は同じコンバージョン（相談）として数える。分けたい場合はGoogle広告側でLINE用・電話用の
+//   コンバージョンを作り、ラベルをここで出し分ける）
+const ADS_CONVERSION_SEND_TO = 'AW-18391141487/3zPyCIOl0vEcEO-YysFE';
+function reportAdsConversion() {
+  if (typeof gtag === 'function') {
+    try { gtag('event', 'conversion', { 'send_to': ADS_CONVERSION_SEND_TO }); } catch (e) { /* 広告タグの失敗は無視 */ }
+  }
+}
+
 const LEAD_SEND_TIMEOUT_MS = 20000; // 相談フォームの返事を待つ時間
 
 function setupLeadCard(diagnosis) {
@@ -2071,9 +2081,7 @@ function setupLeadCard(diagnosis) {
       showLeadMessage('✅ 送信しました。担当者よりご連絡いたします。', false);
       form.reset();
       track('form_sent');
-      if (typeof gtag === 'function') {
-        gtag('event', 'conversion', {'send_to': 'AW-18391141487/3zPyCIOl0vEcEO-YysFE'});
-      }
+      reportAdsConversion();
     } catch (err) {
       console.error(err);
       showLeadMessage('⚠️ 送信できたか確認できませんでした。入力内容はそのまま残してあります。お手数ですが、もう一度お試しいただくか、下のボタンからLINEまたはお電話でご連絡ください。', true);
@@ -2215,7 +2223,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---- 利用状況の記録（広告の効果測定・離脱分析用） ----
   track('page_view');
   document.getElementById('lead-form').addEventListener('focusin', () => track('form_start'), { once: true });
-  document.querySelectorAll('#lead-line-link, [data-track="line_click"]').forEach(a => a.addEventListener('click', () => track('line_click')));
+  document.querySelectorAll('#lead-line-link, [data-track="line_click"]').forEach(a => a.addEventListener('click', () => {
+    track('line_click');
+    reportAdsConversion();
+  }));
+  document.querySelectorAll('[data-track="tel_click"]').forEach(a => a.addEventListener('click', () => reportAdsConversion()));
   document.getElementById('cta-market-btn').addEventListener('click', () => {
     document.getElementById('diag-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
