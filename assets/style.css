@@ -302,3 +302,14 @@ footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 16px
 .score-box.market { background:#f0f7ff; border:2px solid #90cdf4; }
 .score-box.market .score-badge { font-size:30px; }
 #result-area.market-only .diag-only { display:none !important; }
+
+/* ---- 最初の画面を2択に（2026-11） ---- */
+.offer-main-btn { width:100%; box-sizing:border-box; font-size:16px; min-height:52px; }
+.offer-tel { margin:8px 0 0; text-align:center; font-size:13px; color:var(--sub); }
+.offer-tel a { color:var(--blue); font-weight:bold; }
+.self-check-lead { margin:10px 0 6px !important; }
+.self-check-start { margin:22px 0 12px; padding-top:14px; border-top:1px dashed var(--border); }
+.self-check-title { font-size:16px; margin:0 0 6px; }
+.self-check-sub { margin:0 0 6px; font-size:12px; color:var(--sub); line-height:1.7; }
+.self-check-sub a { color:var(--blue); font-weight:bold; }
+.sample-btns .sample-label { font-size:12px; color:var(--sub); align-self:center; }

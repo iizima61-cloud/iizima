@@ -2217,7 +2217,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') closeModal(); });
   document.getElementById('compare-run-btn').addEventListener('click', runCompare);
   document.getElementById('cta-check-btn').addEventListener('click', () => {
-    document.getElementById('drop-zone').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('self-check-start').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   // ---- 利用状況の記録（広告の効果測定・離脱分析用） ----
@@ -2228,7 +2228,8 @@ document.addEventListener('DOMContentLoaded', () => {
     reportAdsConversion();
   }));
   document.querySelectorAll('[data-track="tel_click"]').forEach(a => a.addEventListener('click', () => reportAdsConversion()));
-  document.getElementById('cta-market-btn').addEventListener('click', () => {
+  document.getElementById('cta-market-btn').addEventListener('click', (e) => {
+    e.preventDefault();
     document.getElementById('diag-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 

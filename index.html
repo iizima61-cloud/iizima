@@ -37,38 +37,25 @@
           <li>職人歴30年以上の防水屋が、<b>工程の抜け・材料・金額</b>をチェック</li>
           <li>長野市の飯島防水株式会社が対応。<b>しつこい営業はしません</b></li>
         </ul>
-        <div class="contact-btns">
-          <a class="contact-btn line" href="https://lin.ee/wR2gvs8" target="_blank" rel="noopener" data-track="line_click">💬 LINEで送る</a>
-          <a class="contact-btn tel" href="tel:09018835221" data-track="tel_click">📞 電話で相談</a>
-        </div>
+        <a class="contact-btn line offer-main-btn" href="https://lin.ee/wR2gvs8" target="_blank" rel="noopener" data-track="line_click">💬 見積書を撮ってLINEで送る</a>
+        <p class="offer-tel">お電話でも：<a href="tel:09018835221" data-track="tel_click">090-1883-5221</a></p>
       </div>
 
-      <div class="intro">
-        <b>無料・かんたん3ステップ</b>
-        <div class="steps-row">
-          <div class="step-chip"><span class="step-num">1</span>見積書を撮影・PDFアップロード</div>
-          <div class="step-chip"><span class="step-num">2</span>内容を確認</div>
-          <div class="step-chip"><span class="step-num">3</span>診断する</div>
-        </div>
-        専門用語には <b>やさしい説明</b> をつけていますので、初めての方でも安心してご利用いただけます。
-      </div>
-
-
-      <p class="self-check-lead">自分で確認したい方は、このアプリでその場でチェックできます。</p>
+      <p class="self-check-lead">または</p>
       <button type="button" class="btn-primary hero-cta-btn" id="cta-check-btn">📄 自分で見積書をチェックする</button>
-
-      <div class="no-quote-box">
-        <b>まだ見積書がない方へ</b>
-        <p>工事の種類と面積を入れるだけで、相場の目安がわかります（金額の入力は不要です）。</p>
-        <button type="button" class="btn-copy no-quote-btn" id="cta-market-btn">💡 相場の目安だけ見る</button>
-      </div>
 
       <div id="shared-notice" class="shared-notice" style="display:none;">🔗 共有された診断結果を表示しています。ご自身の見積書でも診断してみましょう。</div>
 
-      <div class="sample-btns">
-        <button class="btn-sample" onclick="loadSample('danger')">サンプル①：あやしい見積り</button>
-        <button class="btn-sample" onclick="loadSample('cheap')">サンプル②：安すぎる見積り</button>
-        <button class="btn-sample" onclick="loadSample('good')">サンプル③：適正な見積り</button>
+      <div class="self-check-start" id="self-check-start">
+        <h2 class="self-check-title">自分で見積書をチェックする</h2>
+        <p class="self-check-sub">①見積書を読み込む → ②内容を確認 → ③診断する、の順に進めます。専門用語にはやさしい説明がつきます。</p>
+        <p class="self-check-sub">まだ見積書がない方は、<a href="#" id="cta-market-btn">相場の目安だけ見る</a>こともできます（金額は空欄でOK）。</p>
+        <div class="sample-btns">
+          <span class="sample-label">見本で試す：</span>
+          <button class="btn-sample" onclick="loadSample('danger')">①あやしい見積り</button>
+          <button class="btn-sample" onclick="loadSample('cheap')">②安すぎる見積り</button>
+          <button class="btn-sample" onclick="loadSample('good')">③適正な見積り</button>
+        </div>
       </div>
 
       <div class="card">
