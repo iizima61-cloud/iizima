@@ -282,6 +282,9 @@ footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 16px
 .no-quote-box b { font-size:14px; color:#1a202c; }
 .no-quote-box p { margin:6px 0 10px; line-height:1.6; }
 .no-quote-btn { width:100%; }
+/* ---- 安さだけで選ばないための確認 ---- */
+.quality-lead { margin:0 0 8px; font-size:13px; color:#4a5568; line-height:1.7; }
+.quality-list { margin:0; padding-left:1.3em; font-size:13px; color:#2d3748; line-height:1.8; }
 /* ---- 見積書の無料チェック（オファー） ---- */
 .offer-box { background:#f0fff4; border:2px solid #06c755; border-radius:14px; padding:16px; margin:14px 0; }
 .offer-eyebrow { margin:0 0 4px; font-size:12px; font-weight:bold; color:#047a35; }
