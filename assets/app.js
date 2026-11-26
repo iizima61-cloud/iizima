@@ -120,11 +120,16 @@ const ATTACHED_RATE_PER_TSUBO = { min: 3000, max: 7000 };
 
 // 外壁・屋根塗装に通常必要な「足場・高圧洗浄・シーリング」の目安。
 // 以前はこれらが相場に入っておらず、足場込みの普通の見積もりでも「やや高め」と出ていた。
-// ※【仮の数字】飯島防水の実勢単価を確認して差し替えること（2026-11 時点で未確認）。
+// 足場・シーリング単価は飯島防水の実勢（2026-11 史郎さん確認）。洗浄単価と各係数は仮。
 const SCAFFOLD_AREA_FACTOR = 1.2;                  // 足場の面積 ≒ 塗装面積 × 1.2（仮）
-const SCAFFOLD_RATE = { min: 700, max: 1000 };     // 足場 1㎡あたり（円・仮）
+const SCAFFOLD_RATE = { min: 800, max: 1200 };     // 足場 1㎡あたり（円・自社実勢）
 const WASH_RATE = { min: 150, max: 300 };          // 高圧洗浄 塗装面積1㎡あたり（円・仮）
-const SEALING_RATE_PER_WALL_SQM = { min: 500, max: 1500 }; // シーリング 外壁面積1㎡あたり換算（円・仮。サイディングは高め、モルタルは低め）
+const SEALING_RATE_PER_M = { min: 1000, max: 1800 }; // シーリング 1mあたり（円・自社実勢：増し打ち約1,000／打ち替え1,200〜1,800）
+const SEALING_M_PER_WALL_SQM = { min: 1.0, max: 1.5 }; // 外壁1㎡あたりのシーリング長さ（m・仮。サイディング想定）
+const SEALING_RATE_PER_WALL_SQM = {
+  min: SEALING_RATE_PER_M.min * SEALING_M_PER_WALL_SQM.min,
+  max: SEALING_RATE_PER_M.max * SEALING_M_PER_WALL_SQM.max
+};
 
 const MANUFACTURER_KEYWORDS = [
   "日本ペイント","関西ペイント","エスケー化研","SK化研","アステックペイント","アステック",
@@ -225,7 +230,7 @@ function loadSample(type) {
   if (type === 'danger') {
     document.getElementById('area-wall').value = 130;
     document.getElementById('area-rooftop').value = 45;
-    document.getElementById('total-price').value = 210;
+    document.getElementById('total-price').value = 250;
     document.getElementById('paint-grade').value = 'silicon';
     document.getElementById('discount-amount').value = 40;
     setChecks(true, true, true, true, true, false);
