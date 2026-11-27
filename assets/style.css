@@ -4,7 +4,7 @@
      ここを紺色にするだけでヘッダーだけでなくアプリ全体のトーンが揃う。 */
   --blue:#1f3a5f; --blue-dark:#13263f; --bg:#f4f6f9; --card:#ffffff;
   --accent-gold:#c9a35e; /* 紺色の背景で読みやすい、落ち着いた金色系のアクセント */
-  --text:#2d3748; --sub:#718096; --border:#e2e8f0;
+  --text:#2d3748; --sub:#4a5568; --border:#e2e8f0;
   --good:#38a169; --good-bg:#f0fff4; --good-border:#68d391;
   --warn:#dd6b20; --warn-bg:#fffaf0; --warn-border:#f6ad55;
   --danger:#e53e3e; --danger-bg:#fff5f5; --danger-border:#fc8181;
@@ -25,7 +25,7 @@ body {
 }
 
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: relative; z-index: 20;
   background: linear-gradient(135deg, var(--blue-dark), var(--blue));
   color: #fff; padding: 14px 16px calc(14px + 2px);
   text-align: center;
@@ -51,10 +51,10 @@ main { padding: 14px 14px calc(90px + var(--safe-bottom)); }
 }
 @media (min-width: 520px) { .bottom-nav { border-radius: 0 0 18px 18px; } }
 .nav-btn {
-  flex: 1; background: none; border: none; padding: 9px 4px 8px; font-size: 11px; font-weight: bold;
+  flex: 1; background: none; border: none; padding: 6px 4px 5px; font-size: 11px; font-weight: bold;
   color: var(--sub); display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
 }
-.nav-btn .ico { font-size: 19px; }
+.nav-btn .ico { font-size: 17px; }
 .nav-btn.active { color: var(--blue-dark); }
 
 /* ==================== 共通カード ==================== */
@@ -193,7 +193,7 @@ input[type="number"], select, input[type="text"], input[type="tel"], input[type=
 .checklist-list { font-weight: bold; color: #2d3748; }
 
 .gauge-wrap { background:#e2e8f0; border-radius: 6px; height: 14px; margin: 10px 0; position: relative; overflow: visible; }
-.gauge-fill { background: linear-gradient(90deg,#68d391,#f6ad55,#fc8181); height: 100%; border-radius: 6px; }
+.gauge-fill { background: linear-gradient(90deg,#fc8181,#f6ad55,#68d391); height: 100%; border-radius: 6px; }
 .gauge-marker { position:absolute; top:-4px; width:3px; height:22px; background:#2d3748; }
 
 .issue-list { margin-top: 10px; }
@@ -250,7 +250,7 @@ input[type="number"], select, input[type="text"], input[type="tel"], input[type=
 .modal-sheet { background:#fff; width:100%; max-width: 480px; max-height: 85vh; overflow-y:auto; border-radius: 16px 16px 0 0; padding: 16px 16px calc(24px + var(--safe-bottom)); }
 .modal-sheet .modal-close { display:block; margin: 0 auto 10px; width: 40px; height: 5px; border-radius: 3px; background: #cbd5e0; border: none; }
 
-footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 16px; }
+footer.note { text-align:center; font-size:11px; color:#4a5568; margin-top: 16px; }
 
 /* ==================== フェーズ3: 共有された診断結果の案内 ==================== */
 .shared-notice { background:#fffaf0; border:1px solid #f6ad55; border-radius:10px; padding:10px 14px; font-size:12px; color:#744210; margin-bottom:12px; }
@@ -315,10 +315,11 @@ footer.note { text-align:center; font-size:11px; color:#a0aec0; margin-top: 16px
 .sample-btns .sample-label { font-size:12px; color:var(--sub); align-self:center; }
 
 /* 診断後、画面の下に常に出るLINEボタン（結果エリアが見えている間だけ） */
-.result-line-bar { position: fixed; left: 0; right: 0; bottom: calc(58px + var(--safe-bottom)); z-index: 25; max-width: 480px; margin: 0 auto; padding: 8px 12px; background: #fff; border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.06); transform: translateY(150%); transition: transform .25s; pointer-events: none; }
+.result-line-bar { position: fixed; left: 0; right: 0; bottom: calc(50px + var(--safe-bottom)); z-index: 25; max-width: 480px; margin: 0 auto; padding: 6px 12px; background: #fff; border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.06); transform: translateY(150%); transition: transform .25s; pointer-events: none; }
 .result-line-bar.show { transform: none; pointer-events: auto; }
-.result-line-btn { display: block; text-align: center; background: #06c755; color: #fff; font-weight: bold; font-size: 15px; padding: 12px 8px; border-radius: 10px; text-decoration: none; }
+.result-line-btn { display: block; text-align: center; background: #06c755; color: #fff; font-weight: bold; font-size: 15px; padding: 10px 8px; border-radius: 10px; text-decoration: none; }
 .result-line-note { display: none; font-size: 11px; color: var(--sub); text-align: center; margin-top: 5px; }
 .result-line-note.show { display: block; }
 main.has-line-bar { padding-bottom: calc(150px + var(--safe-bottom)); }
 .result-offer { margin-top: 12px; }
+.gauge-scale { display:flex; justify-content:space-between; font-size:11px; color:var(--sub); margin:-4px 0 8px; }
