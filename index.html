@@ -223,8 +223,11 @@
         </div>
 
         <div class="card">
-          <h2><span class="step-num">4</span> 見積書の記載内容チェック</h2>
-          <div class="hint">見積書を見て、当てはまるものにチェックを入れてください（AIが読み取った場合は自動でチェックされています）。</div>
+          <h2><span class="step-num">4</span> 見積書の記載内容チェック <span class="optional-tag">飛ばしてOK</span></h2>
+          <p class="skip-note">✅ <b>工事の種類・面積・金額</b>まで入れれば、もう診断できます。下の「この内容で診断する」を押してください。</p>
+          <details id="check-details" class="check-details">
+          <summary>見積書の中身もチェックする（わかる範囲で）</summary>
+          <div class="hint">見積書を見て、当てはまるものにチェックを入れてください（読み取った場合は自動でチェックされています）。</div>
           <div class="check-grid">
             <label class="check-item">
               <input type="checkbox" id="chk-isshiki">
@@ -251,6 +254,7 @@
               <span>「本日契約なら◯◯円引き」「今だけ足場代無料」など、契約を急がせる言葉がある</span>
             </label>
           </div>
+          </details>
         </div>
 
         <div class="sticky-cta">

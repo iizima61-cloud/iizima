@@ -323,3 +323,10 @@ footer.note { text-align:center; font-size:11px; color:#4a5568; margin-top: 16px
 main.has-line-bar { padding-bottom: calc(150px + var(--safe-bottom)); }
 .result-offer { margin-top: 12px; }
 .gauge-scale { display:flex; justify-content:space-between; font-size:11px; color:var(--sub); margin:-4px 0 8px; }
+.optional-tag { display:inline-block; font-size:11px; font-weight:bold; color:#2f855a; background:#f0fff4; border:1px solid #9ae6b4; border-radius:10px; padding:1px 8px; margin-left:4px; vertical-align:middle; }
+.skip-note { font-size:13px; color:var(--text); background:#f0fff4; border-radius:8px; padding:8px 10px; margin:0 0 10px; }
+.check-details > summary { cursor:pointer; font-size:14px; font-weight:bold; color:var(--blue-dark); padding:12px; border:1px solid var(--border); border-radius:8px; background:#fff; list-style:none; }
+.check-details > summary::-webkit-details-marker { display:none; }
+.check-details > summary::before { content:"＋ "; }
+.check-details[open] > summary::before { content:"－ "; }
+.check-details[open] > summary { margin-bottom:10px; }
