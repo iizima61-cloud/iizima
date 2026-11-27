@@ -1697,7 +1697,8 @@ function renderResultFileInfo() {
 function buildTemplateSection(label, questions, key) {
   if (!questions.length) return '';
   const id = 'tmpl-' + key;
-  const text = `【${label}についてご質問です】\nお世話になっております。ご提示いただいたお見積りについて、検討にあたり以下の点を確認させてください。\n\n${questions.join('\n')}\n\nお忙しいところ恐れ入りますが、ご回答のほどよろしくお願いいたします。`;
+  const heading = label.endsWith('について') ? `${label}のご質問です` : 'お見積りについてのご質問です';
+  const text = `【${heading}】\nお世話になっております。ご提示いただいたお見積りについて、検討にあたり以下の点を確認させてください。\n\n${questions.join('\n')}\n\nお忙しいところ恐れ入りますが、ご回答のほどよろしくお願いいたします。`;
   return `<div class="template-section"><h4>■ ${label}</h4><div class="template-box" id="${id}">${text}</div><button type="button" class="btn-copy" onclick="copyTemplate('${id}', this)">コピーする</button></div>`;
 }
 
