@@ -289,7 +289,13 @@ function loadSample(type) {
   document.getElementById('wall-type').value = 'siding';
   document.getElementById('building-floors').value = 'multi';
 }
+function openCheckDetails() {
+  const d = document.getElementById('check-details');
+  if (d) d.open = true;
+}
+
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
+  openCheckDetails();
   document.getElementById('chk-isshiki').checked = isshiki;
   document.getElementById('chk-no-paint-name').checked = noPaint;
   document.getElementById('chk-no-repair').checked = noRepair;
@@ -942,6 +948,7 @@ function applyExtractedData(d, roofInfo) {
   if (roofInfo.roofManufacturerOnly) document.getElementById('roof-paint-manufacturer').value = roofInfo.roofManufacturerOnly;
   if (roofInfo.roofProductOnly) document.getElementById('roof-paint-product').value = roofInfo.roofProductOnly;
 
+  openCheckDetails();
   document.getElementById('chk-isshiki').checked = d.isshikiCount >= 4;
   if (d.isshikiCount > 0) {
     reportLines.push(`📋 見積書の中に「一式」という言葉が <b>${d.isshikiCount}回</b> 見つかりました。${d.isshikiCount >= 4 ? 'やや多めなので、内訳の開示を求めることをおすすめします。' : 'この程度であれば大きな問題ではないことが多いです。'}`);
@@ -1038,7 +1045,7 @@ function getScoreMeaning(score) {
   return 'リスクが高い内容です。契約を急がず、専門家に見積書を見てもらいましょう。';
 }
 
-// 価格判定を5段階（🟢おおむね妥当 / 🟡やや高め / 🟡やや安め / 🔴安すぎる可能性 / ⚪判断材料不足）で返す。
+// 価格判定を6段階（🟢おおむね妥当 / 🟡やや高め / 🔴高すぎる可能性 / 🟡やや安め / 🔴安すぎる可能性 / ⚪判断材料不足）で返す。
 // 施工面積が未入力（expectedMinManが0）、または見積提示総額が未入力（price）の場合は、
 // 無理に🟢🟡🔴で判定せず「⚪ 判断材料不足」とする。
 function getPriceJudgement(price, expectedMinMan, expectedMaxMan) {
@@ -1048,6 +1055,8 @@ function getPriceJudgement(price, expectedMinMan, expectedMaxMan) {
   if (price < expectedMinMan * 0.75) return { icon: '🔴', label: '安すぎる可能性', tone: 'danger' };
   if (price < expectedMinMan * 0.9) return { icon: '🟡', label: 'やや安め', tone: 'warn' };
   if (price <= expectedMaxMan * 1.15) return { icon: '🟢', label: 'おおむね妥当', tone: 'good' };
+  // 目安の上限の1.5倍を超えたら「やや高め」では済ませない（例：目安57万円に150万円で85点になっていた）
+  if (price > expectedMaxMan * 1.5) return { icon: '🔴', label: '高すぎる可能性', tone: 'danger' };
   return { icon: '🟡', label: 'やや高め', tone: 'warn' };
 }
 
@@ -1073,7 +1082,7 @@ const EXPENSIVE_REASON_POINTS = [
 // 総合点を5項目（価格・透明性・施工内容・材料塗料・注意事項）に分解する。
 // 既存のscore計算で使っている判定材料（isIsshiki等）をそのまま流用する。
 function computeSubScores(ctx) {
-  const { priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod } = ctx;
+  const { priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod, contentsReviewed } = ctx;
   const clamp = v => Math.max(0, Math.min(100, v));
 
   const priceScoreMap = { good: 100, warn: 65, danger: 35, neutral: null };
@@ -1096,7 +1105,7 @@ function computeSubScores(ctx) {
   if (discount >= 10) cautionScore -= 30;
   cautionScore = clamp(cautionScore);
 
-  return [
+  const items = [
     { key: 'price', label: '① 価格', score: priceScore,
       desc: priceScore === null ? '面積・工事内容の入力が不足しており判断できません。' : `適正相場と比べて「${priceJudgement.label}」です。` },
     { key: 'transparency', label: '② 見積書の透明性', score: transparencyScore,
@@ -1108,6 +1117,11 @@ function computeSubScores(ctx) {
     { key: 'caution', label: '⑤ 注意事項', score: cautionScore,
       desc: cautionScore < 100 ? '値引きや契約を急がせる表現など、注意したい記載があります。' : '契約を急がせるような不審な記載はありません。' }
   ];
+  // 「4 見積書の記載内容チェック」を飛ばした場合、②〜⑤は「問題なし」ではなく「未チェック」と表示する
+  if (contentsReviewed === false) {
+    items.slice(1).forEach(it => { it.score = null; it.valueText = '未チェック'; it.desc = '見積書の中身はまだ確認していません（「4 見積書の記載内容チェック」を飛ばしたため）。'; });
+  }
+  return items;
 }
 
 function subscoreTone(score) {
@@ -1373,6 +1387,11 @@ function calculateDiagnostic(e) {
   const isNoAttached = document.getElementById('chk-no-attached').checked && paintActive;
   const isNoDrain = document.getElementById('chk-no-drain').checked && waterActive;
   const isPushy = document.getElementById('chk-pushy').checked;
+  // 「4 見積書の記載内容チェック」を開いたか・どれかにチェックがあるか・見積書を読み取ったか。
+  // どれもなければ、金額だけで判定したことになる（何も付けない＝問題なし、とは扱わない）。
+  const checkDetails = document.getElementById('check-details');
+  const contentsReviewed = !!(checkDetails && checkDetails.open) ||
+    [...document.querySelectorAll('#check-details input[type=checkbox]')].some(c => c.checked) || !!lastExtraction;
 
   // ---- 相場計算（円）----
   const paintRate = getPaintRateRange(grade);
@@ -1450,7 +1469,11 @@ function calculateDiagnostic(e) {
   // ---- 価格診断 ----
   const priceJudgement = getPriceJudgement(price, displayMinMan, displayMaxMan);
   if (displayMinMan > 0 && priceJudgement.tone !== 'neutral') {
-    if (priceJudgement.tone === 'danger') {
+    if (priceJudgement.label === '高すぎる可能性') {
+      score -= 35;
+      issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり高い金額です', desc: `目安となる適正相場は約${displayMinMan}万円〜${displayMaxMan}万円ですが、お見積り金額（${price}万円）はそれを大きく上回っています。工事の範囲が入力と違う（別の工事も含まれている等）か、中間業者の手数料や諸経費が大きく乗っている可能性があります。契約前に必ず内訳を確認し、別の専門業者にも見てもらいましょう。` });
+      qGeneral.push('・相場と比べてかなり高い金額に感じました。工事の範囲と、金額の内訳（諸経費・仮設費・管理費など）を項目ごとに教えていただけますか？');
+    } else if (priceJudgement.tone === 'danger') {
       score -= 25;
       issues.push({ level: 'danger', tag: '価格', title: '相場よりかなり安い金額です（手抜き・工程省略のリスク）', desc: `目安となる適正相場は約${displayMinMan}万円〜${displayMaxMan}万円ですが、それを大きく下回っています。下地処理や塗装の回数、必要な部材が省かれている可能性があります。` });
       qGeneral.push('・相場より大変お手頃なお見積りですが、その分どこかの工程を簡略化されているのでしょうか？下地処理や塗り回数など、含まれる工程を具体的に教えてください。');
@@ -1536,7 +1559,15 @@ function calculateDiagnostic(e) {
   const priceHasNoConcern = priceJudgement.tone === 'good' || priceJudgement.tone === 'neutral';
 
   let persona = '', level = '';
-  if (score >= 80) {
+  if (score >= 80 && !contentsReviewed) {
+    // 金額だけで判定した場合は「健康優良児」とは言わない
+    level = 'good';
+    scoreBox.className = 'score-box good';
+    scoreTitle.innerText = priceHasNoConcern ? '🟢 金額は目安どおり（中身は未チェック）' : `🟢 金額は${priceJudgement.label}（中身は未チェック）`;
+    scoreDesc.innerText = '今回は金額だけで判定しています。塗る回数・下地処理・材料など工事の中身は、見積書の写真をLINEで送っていただければ無料でチェックします。';
+    document.getElementById('score-meaning').textContent = `${score}点 - 金額だけで見た点数です（見積書の中身は未チェック）`;
+    persona = '金額は相場から見て大きく外れていません。ただ、見積書の良し悪しは金額だけでは分かりません。塗る回数や下地処理、使う材料が書かれているかで、10年後の差が出ます。下の「4 見積書の記載内容チェック」を開いて確認するか、見積書の写真をLINEで送ってください。';
+  } else if (score >= 80) {
     level = 'good';
     scoreBox.className = 'score-box good';
     if (priceHasNoConcern) {
@@ -1584,10 +1615,10 @@ function calculateDiagnostic(e) {
   document.getElementById('ai-explain').innerHTML = linkifyGlossary(`<p><span class="persona">AI診断士：</span>${persona}</p>`);
 
   /* ---- フェーズ1: 5項目評価 ---- */
-  const subScores = computeSubScores({ priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod });
+  const subScores = computeSubScores({ priceJudgement, isIsshiki, isPushy, discount, paintActive, waterActive, isNoPaintName, isNoRepair, isNoDrain, waterproofMethod, contentsReviewed });
   document.getElementById('subscore-list').innerHTML = subScores.map(s => {
     const tone = subscoreTone(s.score);
-    const valueText = s.score === null ? '判断材料不足' : s.score + '点';
+    const valueText = s.valueText || (s.score === null ? '判断材料不足' : s.score + '点');
     const barWidth = s.score === null ? 0 : s.score;
     return `
       <div class="subscore-item">
@@ -1601,7 +1632,11 @@ function calculateDiagnostic(e) {
   document.getElementById('price-judgement-badge').textContent = `${priceJudgement.icon} ${priceJudgement.label}`;
   const pricePointsHint = document.getElementById('price-judgement-hint');
   const pricePointsEl = document.getElementById('price-judgement-points');
-  if (priceJudgement.tone === 'danger') {
+  if (priceJudgement.label === '高すぎる可能性') {
+    pricePointsHint.textContent = '高くなっている理由の候補：';
+    pricePointsHint.style.display = 'block';
+    pricePointsEl.innerHTML = linkifyGlossary(EXPENSIVE_REASON_POINTS.map(p => `<li>${p}</li>`).join(''));
+  } else if (priceJudgement.tone === 'danger') {
     pricePointsHint.textContent = '確認ポイント：';
     pricePointsHint.style.display = 'block';
     pricePointsEl.innerHTML = linkifyGlossary(CHEAP_CHECK_POINTS.map(p => `<li>${p}</li>`).join(''));
@@ -1962,7 +1997,7 @@ function showHistoryDetail(id) {
         <h2 style="font-size:13px;">📊 5項目でみる診断結果</h2>
         <div class="subscore-list">${r.subScores.map(s => {
           const tone = subscoreTone(s.score);
-          const valueText = s.score === null ? '判断材料不足' : s.score + '点';
+          const valueText = s.valueText || (s.score === null ? '判断材料不足' : s.score + '点');
           const barWidth = s.score === null ? 0 : s.score;
           return `<div class="subscore-item">
             <div class="subscore-head"><span>${s.label}</span><span class="subscore-value ${tone}">${valueText}</span></div>
@@ -2186,7 +2221,8 @@ function buildShareUrl() {
     nr: document.getElementById('chk-no-repair').checked ? 1 : 0,
     na: document.getElementById('chk-no-attached').checked ? 1 : 0,
     nd: document.getElementById('chk-no-drain').checked ? 1 : 0,
-    ps: document.getElementById('chk-pushy').checked ? 1 : 0
+    ps: document.getElementById('chk-pushy').checked ? 1 : 0,
+    rv: document.getElementById('check-details').open ? 1 : 0
   };
   const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(state)))));
   const url = new URL(window.location.href);
@@ -2240,6 +2276,7 @@ function applySharedStateFromUrl() {
     document.getElementById('wall-type').value = WALL_TYPE_LABELS[state.wt] ? state.wt : 'siding';
     document.getElementById('building-floors').value = ['hiraya', 'hiraya_ladder'].includes(state.fl) ? state.fl : 'multi';
     document.getElementById('discount-amount').value = state.disc;
+    if (state.rv || state.isk || state.ps || state.np || state.nr || state.nd || state.na) openCheckDetails();
     document.getElementById('chk-isshiki').checked = !!state.isk;
     document.getElementById('chk-no-paint-name').checked = !!state.np;
     document.getElementById('chk-no-repair').checked = !!state.nr;
