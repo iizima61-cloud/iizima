@@ -50,16 +50,18 @@
         <h2 class="self-check-title">自分で見積書をチェックする</h2>
         <p class="self-check-sub">①見積書を読み込む → ②内容を確認 → ③診断する、の順に進めます。専門用語にはやさしい説明がつきます。</p>
         <p class="self-check-sub">まだ見積書がない方は、<a href="#" id="cta-market-btn">相場の目安だけ見る</a>こともできます（金額は空欄でOK）。</p>
-        <div class="sample-btns">
-          <span class="sample-label">見本で試す：</span>
+      </div>
+
+      <div class="sample-btns sample-btns-top">
+          <span class="sample-label">見本で試す（入力のお手本が入ります）：</span>
           <button class="btn-sample" onclick="loadSample('danger')">①あやしい見積り</button>
           <button class="btn-sample" onclick="loadSample('cheap')">②安すぎる見積り</button>
           <button class="btn-sample" onclick="loadSample('good')">③適正な見積り</button>
-        </div>
       </div>
 
       <div class="card">
         <h2><span class="step-num">1</span> 見積書を読み込む（任意）</h2>
+        <div class="after-read-guide">📷 <b>写真・PDFを読み込んだ方へ</b><br>自動で入った「工事の種類・面積・金額」を確認して、下の<b>「この内容で診断する」を押すだけでOK</b>です。</div>
         <div class="hint">写真（JPG/PNG）またはPDFを選ぶと、金額や面積、塗料の種類などをAIが自動で読み取ってフォームに入力します。読み込まなくても、下のフォームに直接入力すれば診断できます。<b>見積書が何枚かある場合は、表紙と内訳をまとめて選んでください（最大5枚）。</b></div>
         <div id="lib-status"></div>
         <div id="drop-zone">
@@ -77,7 +79,7 @@
         <div id="scan-notice" class="hint" style="display:none;white-space:pre-line;"></div>
 
         <div class="or-divider">― うまく読み込めない場合はこちら ―</div>
-        <label for="paste-text" style="font-weight:normal;font-size:12px;color:#718096;">見積書の文字をコピーしてこちらに貼り付けることもできます</label>
+        <label for="paste-text" style="font-weight:normal;font-size:14px;color:#4b5563;">見積書の文字をコピーしてこちらに貼り付けることもできます</label>
         <textarea id="paste-text" placeholder="例）御見積合計金額 1,250,000円（税込）　施工面積 135.5㎡　シリコン塗料 一式 ..."></textarea>
         <button type="button" class="btn-sample" style="margin-top:8px;" onclick="analyzePastedText()">この文章を解析する</button>
 
@@ -156,11 +158,19 @@
           </div>
         </div>
 
+        <div class="escape-box">
+          <p><b>入力がよく分からない・面倒な方へ</b><br>無理に全部入れなくて大丈夫です。見積書をスマホで撮ってLINEで送るか、お電話いただければ、代表の飯島が直接確認します。</p>
+          <div class="contact-btns">
+            <a class="contact-btn line" href="https://lin.ee/wR2gvs8" target="_blank" rel="noopener" data-track="line_click">💬 LINEで送る</a>
+            <a class="contact-btn tel" href="tel:09018835221" data-track="tel_click">📞 090-1883-5221</a>
+          </div>
+        </div>
+
         <div class="card">
           <h2><span class="step-num">3</span> 見積もり提示総額</h2>
           <div class="hint">見積書に書かれている「合計金額（税込）」を入力してください。<b>まだ見積書がない方は空欄のままでOK</b>です（相場の目安だけを表示します）。</div>
           <div class="form-group">
-            <label>見積もり提示総額（万円）<span style="font-weight:normal;color:#718096;">　※空欄なら相場の目安だけ表示</span></label>
+            <label>見積もり提示総額（万円）<span style="font-weight:normal;color:#4b5563;">　※空欄なら相場の目安だけ表示</span></label>
             <input type="number" id="total-price" min="0.1" step="any" placeholder="例）135" inputmode="decimal">
           </div>
           <div class="form-group">
@@ -174,6 +184,25 @@
               <option value="inorganic">無機（最高耐久グレード）</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>防水工事の工法（バルコニー防水・屋上防水を選んだ場合）<span id="method-auto" class="auto-tag" style="display:none;">AIが検出</span></label>
+            <select id="waterproof-method">
+              <option value="unknown">わからない・書いていない</option>
+              <option value="urethane" selected>ウレタン防水（密着・通気緩衝工法など）</option>
+              <option value="frp">FRP防水（ベランダ・バルコニーで人気）</option>
+              <option value="sheet">塩ビシート防水（屋上など広い面で人気）</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>断熱材の有無（分かれば選択）</label>
+            <select id="waterproof-insulation">
+              <option value="none" selected>断熱材なし</option>
+              <option value="insulated">断熱材あり</option>
+            </select>
+            <div class="hint" style="margin-bottom:0;">断熱材ありの場合、防水工事の適正相場は約1.6倍で計算されます（材料費・手間が増えるため）。</div>
+          </div>
+          <details id="price-details" class="more-details">
+          <summary>塗料メーカーや商品名・値引き額も詳しく入力する（任意・分からなければ飛ばしてOK）</summary>
           <div class="form-group">
             <label>塗料メーカー（分かれば入力・任意）</label>
             <input type="text" id="paint-manufacturer" list="manufacturer-list" placeholder="例）日本ペイント">
@@ -200,26 +229,10 @@
             </div>
           </div>
           <div class="form-group">
-            <label>防水工事の工法（バルコニー防水・屋上防水を選んだ場合）<span id="method-auto" class="auto-tag" style="display:none;">AIが検出</span></label>
-            <select id="waterproof-method">
-              <option value="unknown">わからない・書いていない</option>
-              <option value="urethane" selected>ウレタン防水（密着・通気緩衝工法など）</option>
-              <option value="frp">FRP防水（ベランダ・バルコニーで人気）</option>
-              <option value="sheet">塩ビシート防水（屋上など広い面で人気）</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>断熱材の有無（分かれば選択）</label>
-            <select id="waterproof-insulation">
-              <option value="none" selected>断熱材なし</option>
-              <option value="insulated">断熱材あり</option>
-            </select>
-            <div class="hint" style="margin-bottom:0;">断熱材ありの場合、防水工事の適正相場は約1.6倍で計算されます（材料費・手間が増えるため）。</div>
-          </div>
-          <div class="form-group">
             <label>値引き額（万円）※見積書に大幅値引きがあれば入力</label>
             <input type="number" id="discount-amount" value="0" min="0" step="any">
           </div>
+          </details>
         </div>
 
         <div class="card">
