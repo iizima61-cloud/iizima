@@ -280,6 +280,7 @@ function loadSample(type) {
   onScopeChange();
   onAreaChange();
   document.getElementById('ai-report').style.display = 'none';
+  setTimeout(openPriceDetailsIfFilled, 0);
   lastExtraction = null; // 見本を開いたときに、前に読み取った見積書の金額が「理由」に残らないようにする
   document.getElementById('paint-manufacturer').value = '';
   document.getElementById('paint-product').value = '';
@@ -292,6 +293,14 @@ function loadSample(type) {
 function openCheckDetails() {
   const d = document.getElementById('check-details');
   if (d) d.open = true;
+}
+
+// 「塗料メーカー・商品名・値引き額」の折りたたみ：何か入っていたら開いて見せる
+function openPriceDetailsIfFilled() {
+  const d = document.getElementById('price-details');
+  if (!d) return;
+  const v = id => (document.getElementById(id) || {}).value || '';
+  if (v('paint-manufacturer') || v('paint-product') || v('roof-paint-manufacturer') || v('roof-paint-product') || (parseFloat(v('discount-amount')) || 0) > 0) d.open = true;
 }
 
 function setChecks(isshiki, noPaint, noRepair, noDrain, pushy, noAttached) {
@@ -946,6 +955,7 @@ function applyExtractedData(d, roofInfo) {
 
   // ---- 屋根塗装用メーカー・商品名（「屋根」の近くで区別できた場合だけ自動入力） ----
   if (roofInfo.roofManufacturerOnly) document.getElementById('roof-paint-manufacturer').value = roofInfo.roofManufacturerOnly;
+  openPriceDetailsIfFilled();
   if (roofInfo.roofProductOnly) document.getElementById('roof-paint-product').value = roofInfo.roofProductOnly;
 
   openCheckDetails();
@@ -2345,6 +2355,7 @@ document.addEventListener('DOMContentLoaded', () => {
   onAreaChange();
   checkLibraries();
 
+  openPriceDetailsIfFilled();
   if (sharedLoaded) {
     document.getElementById('shared-notice').style.display = 'block';
     calculateDiagnostic({ preventDefault: () => {} });
